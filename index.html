@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小红书长文排版工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+
+        .main-content {
+            display: flex;
+            gap: 30px;
+            align-items: flex-start;
+        }
+
+        .input-section {
+            flex: 1;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .output-section {
+            flex: 1;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 300px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            resize: vertical;
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #ff2442;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #e01f3d;
+        }
+
+        .secondary-btn {
+            background-color: #666;
+        }
+
+        .secondary-btn:hover {
+            background-color: #555;
+        }
+
+        .preview-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        .page-preview {
+            width: 300px;
+            height: 533px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+
+        .page-content {
+            padding: 30px 25px;
+            font-size: 14px;
+            line-height: 1.8;
+            color: #333;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .page-content p {
+            margin-bottom: 16px;
+            text-align: justify;
+        }
+
+        .page-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        .page-number {
+            position: absolute;
+            bottom: 15px;
+            right: 20px;
+            color: #999;
+            font-size: 12px;
+        }
+
+        .watermark {
+            position: absolute;
+            bottom: 15px;
+            left: 20px;
+            color: #ccc;
+            font-size: 12px;
+        }
+
+        .settings {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 5px;
+        }
+
+        .setting-item {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        label {
+            min-width: 100px;
+            font-size: 14px;
+        }
+
+        input[type="number"],
+        input[type="text"] {
+            padding: 5px 10px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            width: 200px;
+        }
+
+        .download-section {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        #canvas {
+            display: none;
+        }
+
+        .tips {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            font-size: 13px;
+            color: #856404;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>小红书长文排版工具</h1>
+
+        <div class="main-content">
+            <div class="input-section">
+                <h2>输入文本</h2>
+                <textarea id="inputText" placeholder="请输入您要排版的长文内容..."></textarea>
+
+                <div class="settings">
+                    <div class="setting-item">
+                        <label>每页字数：</label>
+                        <input type="number" id="charsPerPage" value="200" min="100" max="500">
+                    </div>
+                    <div class="setting-item">
+                        <label>字体大小：</label>
+                        <input type="number" id="fontSize" value="14" min="12" max="20"> px
+                    </div>
+                    <div class="setting-item">
+                        <label>行高：</label>
+                        <input type="number" id="lineHeight" value="1.8" min="1.2" max="2.5" step="0.1">
+                    </div>
+                    <div class="setting-item">
+                        <label>水印文字：</label>
+                        <input type="text" id="watermarkText" placeholder="输入水印文字（可选）">
+                    </div>
+                    <div class="setting-item">
+                        <label>背景样式：</label>
+                        <select id="bgStyle"
+                            style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 200px;">
+                            <option value="white">纯白</option>
+                            <option value="cream">米色</option>
+                            <option value="paper">纸张纹理</option>
+                            <option value="gradient1">渐变粉</option>
+                            <option value="gradient2">渐变蓝</option>
+                            <option value="gradient3">渐变紫</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <button onclick="generatePages()">生成排版</button>
+                    <button class="secondary-btn" onclick="clearAll()">清空</button>
+                </div>
+
+                <div class="tips">
+                    <strong>使用提示：</strong>
+                    <ul style="margin-left: 20px; margin-top: 5px;">
+                        <li>输入文本后点击"生成排版"</li>
+                        <li>系统会根据句号自动分段</li>
+                        <li>每页会尽量保持完整的句子</li>
+                        <li>点击"下载当前页"可保存单张图片</li>
+                        <li>点击"下载所有页"可批量保存</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="output-section">
+                <h2>预览效果</h2>
+                <div id="previewContainer" class="preview-container"></div>
+                <div class="download-section" id="downloadSection" style="display: none;">
+                    <button onclick="downloadCurrentPage()">下载当前页</button>
+                    <button onclick="downloadAllPages()">下载所有页</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        let currentPages = [];
+        let currentPageIndex = 0;
+
+        function splitTextIntoPages(text, charsPerPage) {
+            // 保留用户的分段格式
+            const paragraphs = text.split(/\n+/).filter(p => p.trim());
+
+            const pages = [];
+            let currentPage = [];
+            let currentCharCount = 0;
+
+            for (const paragraph of paragraphs) {
+                // 如果段落本身就很长，需要分割
+                if (paragraph.length > charsPerPage) {
+                    // 先完成当前页
+                    if (currentPage.length > 0) {
+                        pages.push(currentPage);
+                        currentPage = [];
+                        currentCharCount = 0;
+                    }
+
+                    // 按句号分割长段落
+                    const sentences = paragraph.split(/([。！？.!?])/);
+                    let tempParagraph = '';
+
+                    for (let i = 0; i < sentences.length; i += 2) {
+                        const sentence = sentences[i] + (sentences[i + 1] || '');
+                        if (tempParagraph.length + sentence.length > charsPerPage && tempParagraph) {
+                            currentPage.push(tempParagraph.trim());
+                            pages.push(currentPage);
+                            currentPage = [];
+                            tempParagraph = sentence;
+                        } else {
+                            tempParagraph += sentence;
+                        }
+                    }
+
+                    if (tempParagraph) {
+                        currentPage.push(tempParagraph.trim());
+                        currentCharCount = tempParagraph.length;
+                    }
+                } else {
+                    // 检查是否需要新页
+                    if (currentCharCount + paragraph.length > charsPerPage && currentPage.length > 0) {
+                        pages.push(currentPage);
+                        currentPage = [paragraph];
+                        currentCharCount = paragraph.length;
+                    } else {
+                        currentPage.push(paragraph);
+                        currentCharCount += paragraph.length;
+                    }
+                }
+            }
+
+            // 添加最后一页
+            if (currentPage.length > 0) {
+                pages.push(currentPage);
+            }
+
+            return pages;
+        }
+
+        function formatTextWithParagraphs(paragraphs) {
+            return paragraphs.map(p => `<p>${p.trim()}</p>`).join('');
+        }
+
+        function applyBackground(element, bgStyle) {
+            switch (bgStyle) {
+                case 'cream':
+                    element.style.background = '#FFF8E7';
+                    break;
+                case 'paper':
+                    element.style.background = `
+                        repeating-linear-gradient(
+                            90deg,
+                            #FAFAFA,
+                            #FAFAFA 1px,
+                            #FFF 1px,
+                            #FFF 20px
+                        )`;
+                    break;
+                case 'gradient1':
+                    element.style.background = 'linear-gradient(135deg, #FFE0EC 0%, #FFF5E0 100%)';
+                    break;
+                case 'gradient2':
+                    element.style.background = 'linear-gradient(135deg, #E0F0FF 0%, #F0E0FF 100%)';
+                    break;
+                case 'gradient3':
+                    element.style.background = 'linear-gradient(135deg, #F5E0FF 0%, #E0E8FF 100%)';
+                    break;
+                default:
+                    element.style.background = 'white';
+            }
+        }
+
+        function generatePages() {
+            const inputText = document.getElementById('inputText').value;
+            if (!inputText.trim()) {
+                alert('请输入要排版的文本');
+                return;
+            }
+
+            const charsPerPage = parseInt(document.getElementById('charsPerPage').value);
+            const fontSize = document.getElementById('fontSize').value;
+            const lineHeight = document.getElementById('lineHeight').value;
+            const watermarkText = document.getElementById('watermarkText').value;
+            const bgStyle = document.getElementById('bgStyle').value;
+
+            currentPages = splitTextIntoPages(inputText, charsPerPage);
+
+            const previewContainer = document.getElementById('previewContainer');
+            previewContainer.innerHTML = '';
+
+            currentPages.forEach((pageTextArray, index) => {
+                const pageDiv = document.createElement('div');
+                pageDiv.className = 'page-preview';
+                pageDiv.setAttribute('data-page-index', index);
+                applyBackground(pageDiv, bgStyle);
+
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'page-content';
+                contentDiv.style.fontSize = fontSize + 'px';
+                contentDiv.style.lineHeight = lineHeight;
+                contentDiv.innerHTML = formatTextWithParagraphs(pageTextArray);
+
+                const pageNumber = document.createElement('div');
+                pageNumber.className = 'page-number';
+                pageNumber.textContent = `${index + 1}/${currentPages.length}`;
+
+                if (watermarkText) {
+                    const watermark = document.createElement('div');
+                    watermark.className = 'watermark';
+                    watermark.textContent = watermarkText;
+                    pageDiv.appendChild(watermark);
+                }
+
+                pageDiv.appendChild(contentDiv);
+                pageDiv.appendChild(pageNumber);
+
+                pageDiv.onclick = () => {
+                    currentPageIndex = index;
+                    document.querySelectorAll('.page-preview').forEach(p => p.style.border = '1px solid #ddd');
+                    pageDiv.style.border = '2px solid #ff2442';
+                };
+
+                previewContainer.appendChild(pageDiv);
+            });
+
+            if (currentPages.length > 0) {
+                document.getElementById('downloadSection').style.display = 'block';
+            }
+        }
+
+        function downloadPage(pageIndex) {
+            const pageElement = document.querySelector(`[data-page-index="${pageIndex}"]`);
+            if (!pageElement) return;
+
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+
+            // 设置画布尺寸（小红书推荐 3:4 比例）
+            canvas.width = 900;
+            canvas.height = 1600;
+
+            // 获取背景样式并绘制
+            const bgStyle = document.getElementById('bgStyle').value;
+            switch (bgStyle) {
+                case 'cream':
+                    ctx.fillStyle = '#FFF8E7';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    break;
+                case 'paper':
+                    ctx.fillStyle = '#FAFAFA';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    // 添加纸张纹理效果
+                    ctx.strokeStyle = '#F0F0F0';
+                    ctx.lineWidth = 1;
+                    for (let i = 0; i < canvas.width; i += 20) {
+                        ctx.beginPath();
+                        ctx.moveTo(i, 0);
+                        ctx.lineTo(i, canvas.height);
+                        ctx.stroke();
+                    }
+                    break;
+                case 'gradient1':
+                    const grad1 = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+                    grad1.addColorStop(0, '#FFE0EC');
+                    grad1.addColorStop(1, '#FFF5E0');
+                    ctx.fillStyle = grad1;
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    break;
+                case 'gradient2':
+                    const grad2 = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+                    grad2.addColorStop(0, '#E0F0FF');
+                    grad2.addColorStop(1, '#F0E0FF');
+                    ctx.fillStyle = grad2;
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    break;
+                case 'gradient3':
+                    const grad3 = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+                    grad3.addColorStop(0, '#F5E0FF');
+                    grad3.addColorStop(1, '#E0E8FF');
+                    ctx.fillStyle = grad3;
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    break;
+                default:
+                    ctx.fillStyle = 'white';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            // 获取页面内容
+            const content = pageElement.querySelector('.page-content').innerHTML;
+            const fontSize = parseInt(document.getElementById('fontSize').value);
+            const lineHeight = parseFloat(document.getElementById('lineHeight').value);
+            const watermarkText = document.getElementById('watermarkText').value;
+
+            // 设置字体
+            ctx.font = `${fontSize * 3}px -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif`;
+            ctx.fillStyle = '#333';
+
+            // 绘制文本
+            const padding = 90;
+            let y = padding + fontSize * 3;
+
+            // 解析HTML并绘制文本
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = content;
+            const paragraphs = tempDiv.querySelectorAll('p');
+
+            paragraphs.forEach((p, pIndex) => {
+                const text = p.textContent;
+                const maxWidth = canvas.width - padding * 2;
+                const words = text.split('');
+                let line = '';
+
+                for (let n = 0; n < words.length; n++) {
+                    const testLine = line + words[n];
+                    const metrics = ctx.measureText(testLine);
+                    const testWidth = metrics.width;
+
+                    if (testWidth > maxWidth && n > 0) {
+                        ctx.fillText(line, padding, y);
+                        line = words[n];
+                        y += fontSize * 3 * lineHeight;
+                    } else {
+                        line = testLine;
+                    }
+                }
+                ctx.fillText(line, padding, y);
+
+                // 段落间距（最后一段不加）
+                if (pIndex < paragraphs.length - 1) {
+                    y += fontSize * 3 * lineHeight * 1.8;
+                }
+            });
+
+            // 绘制页码
+            ctx.font = '36px Arial';
+            ctx.fillStyle = '#999';
+            ctx.textAlign = 'right';
+            ctx.fillText(`${pageIndex + 1}/${currentPages.length}`, canvas.width - 60, canvas.height - 45);
+
+            // 绘制水印
+            if (watermarkText) {
+                ctx.font = '36px Arial';
+                ctx.fillStyle = '#ccc';
+                ctx.textAlign = 'left';
+                ctx.fillText(watermarkText, 60, canvas.height - 45);
+            }
+
+            // 下载图片
+            canvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `小红书排版_第${pageIndex + 1}页.png`;
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+        }
+
+        function downloadCurrentPage() {
+            downloadPage(currentPageIndex);
+        }
+
+        function downloadAllPages() {
+            if (confirm(`确定要下载全部 ${currentPages.length} 页吗？`)) {
+                let delay = 0;
+                currentPages.forEach((_, index) => {
+                    setTimeout(() => downloadPage(index), delay);
+                    delay += 500; // 延迟下载，避免浏览器阻止
+                });
+            }
+        }
+
+        function clearAll() {
+            document.getElementById('inputText').value = '';
+            document.getElementById('previewContainer').innerHTML = '';
+            document.getElementById('downloadSection').style.display = 'none';
+            currentPages = [];
+            currentPageIndex = 0;
+        }
+
+        // 示例文本
+        document.getElementById('inputText').value = `这是一个示例文本。小红书是一个生活方式分享平台，用户可以通过图片、视频和文字记录生活点滴，发现美好事物。
+
+在这个平台上，你可以找到各种生活灵感。从美食制作到旅行攻略，从护肤心得到穿搭技巧，每个人都能在这里找到自己感兴趣的内容。
+
+创作者们用心分享着自己的经验和见解。他们通过精美的图片和详细的文字，帮助其他用户解决生活中的各种问题。这种分享精神让小红书成为了一个充满正能量的社区。
+
+对于长文创作者来说，如何将大段文字优雅地呈现在小红书上是一个挑战。这个工具就是为了解决这个问题而设计的。它可以帮助你自动将长文分页，并生成适合小红书发布的图片格式。`;
+    </script>
+</body>
+
+</html>
