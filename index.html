@@ -103,28 +103,26 @@
             height: 533px;
             background: white;
             border: 1px solid #ddd;
-            border-radius: 10px;
             overflow: hidden;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             position: relative;
         }
 
         .page-content {
-            padding: 30px 25px;
+            padding: 0;
+            margin: 0;
             font-size: 14px;
             line-height: 1.8;
             color: #333;
-            height: 100%;
+            word-wrap: break-word;
+            word-break: break-all;
             overflow: hidden;
         }
 
         .page-content p {
-            margin-bottom: 16px;
+            margin: 0;
             text-align: justify;
-        }
-
-        .page-content p:last-child {
-            margin-bottom: 0;
+            word-break: break-all;
         }
 
         .page-number {
@@ -188,7 +186,91 @@
             font-size: 13px;
             color: #856404;
         }
+
+        .editor-toolbar {
+            margin-bottom: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+
+        .toolbar-btn {
+            padding: 5px 10px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background-color 0.3s;
+        }
+
+        .toolbar-btn:hover {
+            background: #5a6268;
+        }
+
+        .color-selector {
+            display: flex;
+            gap: 3px;
+            margin-left: 10px;
+        }
+
+        .color-btn {
+            width: 20px;
+            height: 20px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .markdown-preview {
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #f9f9f9;
+            font-size: 12px;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+
+        .page-header {
+            padding: 15px 25px 0;
+            font-weight: bold;
+            color: #666;
+            border-bottom: 1px solid #eee;
+            margin-bottom: 10px;
+        }
+
+        .md-table {
+            border-collapse: collapse;
+            margin: 10px 0;
+            width: 100%;
+            font-size: 13px;
+            background: #fff;
+        }
+
+        .md-table th,
+        .md-table td {
+            border: 1px solid #ddd;
+            padding: 6px 10px;
+            text-align: left;
+        }
+
+        .md-table th {
+            background: #f5f5f5;
+            font-weight: bold;
+        }
+
+        .md-table tr:nth-child(even) td {
+            background: #fafafa;
+        }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 </head>
 
 <body>
@@ -198,41 +280,165 @@
         <div class="main-content">
             <div class="input-section">
                 <h2>输入文本</h2>
+                <div class="editor-toolbar">
+                    <button class="toolbar-btn" onclick="insertHeading('#')" title="一级标题">H1</button>
+                    <button class="toolbar-btn" onclick="insertHeading('##')" title="二级标题">H2</button>
+                    <button class="toolbar-btn" onclick="insertHeading('###')" title="三级标题">H3</button>
+                    <button class="toolbar-btn" onclick="insertMarkdown('**', '**')" title="加粗">💪 加粗</button>
+                    <button class="toolbar-btn" onclick="insertMarkdown('*', '*')" title="斜体"><em>I</em> 斜体</button>
+                    <button class="toolbar-btn" onclick="insertMarkdown('__', '__')" title="下划线"><u>U</u> 下划线</button>
+                    <button class="toolbar-btn" onclick="insertMarkdown('~~', '~~')" title="删除线"><s>S</s> 删除线</button>
+                    <div class="color-selector">
+                        <div class="color-btn" style="background: #ff4757;" onclick="insertColor('#ff4757')" title="红色">
+                        </div>
+                        <div class="color-btn" style="background: #5352ed;" onclick="insertColor('#5352ed')" title="蓝色">
+                        </div>
+                        <div class="color-btn" style="background: #2ed573;" onclick="insertColor('#2ed573')" title="绿色">
+                        </div>
+                        <div class="color-btn" style="background: #ffa502;" onclick="insertColor('#ffa502')" title="橙色">
+                        </div>
+                        <div class="color-btn" style="background: #ff6348;" onclick="insertColor('#ff6348')"
+                            title="珊瑚色"></div>
+                        <div class="color-btn" style="background: #a55eea;" onclick="insertColor('#a55eea')" title="紫色">
+                        </div>
+                    </div>
+                </div>
                 <textarea id="inputText" placeholder="请输入您要排版的长文内容..."></textarea>
+                <div class="markdown-preview" id="markdownPreview" style="display:none;">
+                    <strong>预览：</strong><br>
+                    <div id="previewContent"></div>
+                </div>
 
                 <div class="settings">
                     <div class="setting-item">
-                        <label>每页字数：</label>
-                        <input type="number" id="charsPerPage" value="200" min="100" max="500">
-                    </div>
-                    <div class="setting-item">
                         <label>字体大小：</label>
-                        <input type="number" id="fontSize" value="14" min="12" max="20"> px
+                        <input type="number" id="fontSize" value="13" min="12" max="20" title="设置字体大小"
+                            aria-label="字体大小">
+                        px
                     </div>
                     <div class="setting-item">
                         <label>行高：</label>
-                        <input type="number" id="lineHeight" value="1.8" min="1.2" max="2.5" step="0.1">
+                        <input type="number" id="lineHeight" value="1.8" min="1.2" max="2.5" step="0.1" title="设置行高"
+                            aria-label="行高">
                     </div>
                     <div class="setting-item">
                         <label>水印文字：</label>
-                        <input type="text" id="watermarkText" placeholder="输入水印文字（可选）">
+                        <input type="text" id="watermarkText" placeholder="输入水印文字（可选）" title="设置水印文字" aria-label="水印文字">
                     </div>
                     <div class="setting-item">
-                        <label>背景样式：</label>
-                        <select id="bgStyle"
+                        <label>背景颜色：</label>
+                        <select id="bgColor" title="选择背景颜色" aria-label="背景颜色"
                             style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 200px;">
                             <option value="white">纯白</option>
                             <option value="cream">米色</option>
-                            <option value="paper">纸张纹理</option>
+                            <option value="light-pink">淡粉色</option>
+                            <option value="light-blue">淡蓝色</option>
+                            <option value="light-green">淡绿色</option>
+                            <option value="light-yellow">淡黄色</option>
+                            <option value="light-purple">淡紫色</option>
+                            <option value="light-gray">淡灰色</option>
                             <option value="gradient1">渐变粉</option>
                             <option value="gradient2">渐变蓝</option>
                             <option value="gradient3">渐变紫</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label>纹理效果：</label>
+                        <select id="bgTexture" title="选择背景纹理" aria-label="背景纹理"
+                            style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 200px;">
+                            <option value="none">无</option>
+                            <option value="paper">纸张纹理</option>
+                            <option value="dots">点阵</option>
+                            <option value="lines">横线</option>
+                            <option value="grid">网格</option>
+                            <option value="notebook">笔记本</option>
+                            <option value="memo">便笺纹理</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label>风格预设：</label>
+                        <select id="stylePreset" onchange="applyPreset()" title="选择风格预设" aria-label="风格预设"
+                            style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 200px;">
+                            <option value="custom">自定义</option>
+                            <option value="classic-memo">经典备忘录</option>
+                            <option value="modern-note">现代笔记</option>
+                            <option value="vintage-paper">复古纸张</option>
+                            <option value="minimal-clean">简约清新</option>
+                            <option value="warm-journal">温暖日记</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label>图片比例：</label>
+                        <select id="aspectRatio" onchange="updatePreviewSize()" title="选择图片比例" aria-label="图片比例"
+                            style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 200px;">
+                            <option value="2:3">2:3 竖版</option>
+                            <option value="3:4">3:4 小红书推荐</option>
+                            <option value="1:1">1:1 正方形</option>
+                            <option value="4:3">4:3 横向</option>
+                            <option value="16:9">16:9 宽屏</option>
+                            <option value="9:16">9:16 竖屏</option>
+                            <option value="custom">自定义尺寸</option>
+                        </select>
+                    </div>
+                    <div class="setting-item" id="customSizeOptions" style="display:none;">
+                        <label>自定义宽度：</label>
+                        <input type="number" id="customWidth" value="900" min="300" max="2000"> px
+                        <label style="margin-left: 15px;">高度：</label>
+                        <input type="number" id="customHeight" value="1600" min="300" max="2000"> px
+                    </div>
+                    <div class="setting-item">
+                        <label>字体选择：</label>
+                        <select id="fontFamily" title="选择字体" aria-label="字体选择"
+                            style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 200px;">
+                            <option value="default">系统默认</option>
+                            <option value="SimHei">黑体</option>
+                            <option value="SimSun">宋体</option>
+                            <option value="KaiTi">楷体</option>
+                            <option value="Microsoft YaHei">微软雅黑</option>
+                            <option value="PingFang SC">苹方</option>
+                            <option value="Hiragino Sans GB">冬青黑体</option>
+                            <option value="Arial">Arial</option>
+                            <option value="Times New Roman">Times New Roman</option>
+                            <option value="custom">上传自定义字体</option>
+                        </select>
+                    </div>
+                    <div class="setting-item" id="customFontUpload" style="display:none;">
+                        <label>字体文件：</label>
+                        <input type="file" id="fontFile" accept=".ttf,.otf,.woff,.woff2"
+                            style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 200px;">
+                        <button type="button" onclick="loadCustomFont()" class="toolbar-btn"
+                            style="margin-left: 10px;">加载字体</button>
+                    </div>
+                    <div class="setting-item">
+                        <label>字体下载：</label>
+                        <button type="button" onclick="showFontDownloadInfo()" class="toolbar-btn">获取字体资源</button>
+                        <span style="font-size: 12px; color: #666; margin-left: 10px;">获取免费中文字体下载链接</span>
+                    </div>
+                    <div class="setting-item">
+                        <label>页眉设置：</label>
+                        <input type="checkbox" id="enableHeader" onchange="toggleHeaderOptions()" title="启用固定页眉"
+                            aria-label="启用固定页眉">
+                        <span>启用固定页眉</span>
+                    </div>
+                    <div class="setting-item" id="headerOptions" style="display:none;">
+                        <label>页眉文字：</label>
+                        <input type="text" id="headerText" placeholder="输入页眉文字"
+                            style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 200px;">
+                    </div>
+                    <div class="setting-item" id="headerStyleOptions" style="display:none;">
+                        <label>页眉样式：</label>
+                        <select id="headerStyle"
+                            style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 200px;">
+                            <option value="center">居中</option>
+                            <option value="left">左对齐</option>
+                            <option value="right">右对齐</option>
                         </select>
                     </div>
                 </div>
 
                 <div class="controls">
                     <button onclick="generatePages()">生成排版</button>
+                    <button class="secondary-btn" onclick="togglePreview()">切换预览</button>
                     <button class="secondary-btn" onclick="clearAll()">清空</button>
                 </div>
 
@@ -240,8 +446,13 @@
                     <strong>使用提示：</strong>
                     <ul style="margin-left: 20px; margin-top: 5px;">
                         <li>输入文本后点击"生成排版"</li>
-                        <li>系统会根据句号自动分段</li>
-                        <li>每页会尽量保持完整的句子</li>
+                        <li>智能分页：系统自动分页，确保内容不覆盖水印和页码</li>
+                        <li>回车控制：使用回车控制段落间距和空白，多个回车创建更多空白</li>
+                        <li>内容保护：页面容量智能计算，避免内容超出范围</li>
+                        <li>支持Markdown格式：# 一级标题 ## 二级标题 ### 三级标题 **加粗** *斜体* __下划线__ [color:#ff0000]红色[/color]</li>
+                        <li>可使用工具栏快速添加格式，或手动编写Markdown</li>
+                        <li>标题功能：点击H1/H2/H3按钮快速添加标题，或手动输入#、##、###</li>
+                        <li>点击"切换预览"查看格式效果</li>
                         <li>点击"下载当前页"可保存单张图片</li>
                         <li>点击"下载所有页"可批量保存</li>
                     </ul>
@@ -262,297 +473,632 @@
     <canvas id="canvas"></canvas>
 
     <script>
+        // 全局变量声明
         let currentPages = [];
         let currentPageIndex = 0;
 
-        function splitTextIntoPages(text, charsPerPage) {
-            // 保留用户的分段格式
-            const paragraphs = text.split(/\n+/).filter(p => p.trim());
+        // 恢复最初的分页函数：段落整体分页，不分行填满
+        function splitTextIntoPages(text) {
+            try {
+                const fontSize = parseInt(document.getElementById('fontSize').value) || 13;
+                const lineHeight = parseFloat(document.getElementById('lineHeight').value) || 1.8;
+                const enableHeader = document.getElementById('enableHeader').checked || false;
+                const aspectRatio = document.getElementById('aspectRatio').value || '2:3';
+                const dimensions = getAspectRatioDimensions(aspectRatio);
 
-            const pages = [];
-            let currentPage = [];
-            let currentCharCount = 0;
+                const pageHeight = dimensions.preview.height;
+                const pageWidth = dimensions.preview.width;
 
-            for (const paragraph of paragraphs) {
-                // 如果段落本身就很长，需要分割
-                if (paragraph.length > charsPerPage) {
-                    // 先完成当前页
-                    if (currentPage.length > 0) {
-                        pages.push(currentPage);
-                        currentPage = [];
-                        currentCharCount = 0;
+                const padding = {
+                    top: 15,
+                    bottom: 20,
+                    left: 20,
+                    right: 20
+                };
+                const headerHeight = enableHeader ? 30 : 0;
+                const footerHeight = 30;
+                const availableHeight = pageHeight - padding.top - padding.bottom - headerHeight - footerHeight;
+                const availableWidth = pageWidth - padding.left - padding.right;
+                const lineHeightPx = fontSize * lineHeight;
+                const maxLinesPerPage = Math.max(1, Math.floor(availableHeight / lineHeightPx) - 1);
+                const charsPerLine = Math.floor(availableWidth / (fontSize * 0.9));
+
+                const paragraphs = text.split('\n');
+                // 处理每个段落，计算实际占用的行数
+                const processedParagraphs = paragraphs.map(paragraph => {
+                    if (paragraph.trim() === '') {
+                        // 空行占一行
+                        return {
+                            text: '',
+                            lines: 1,
+                            isEmptyLine: true
+                        };
                     }
-
-                    // 按句号分割长段落
-                    const sentences = paragraph.split(/([。！？.!?])/);
-                    let tempParagraph = '';
-
-                    for (let i = 0; i < sentences.length; i += 2) {
-                        const sentence = sentences[i] + (sentences[i + 1] || '');
-                        if (tempParagraph.length + sentence.length > charsPerPage && tempParagraph) {
-                            currentPage.push(tempParagraph.trim());
-                            pages.push(currentPage);
-                            currentPage = [];
-                            tempParagraph = sentence;
-                        } else {
-                            tempParagraph += sentence;
-                        }
-                    }
-
-                    if (tempParagraph) {
-                        currentPage.push(tempParagraph.trim());
-                        currentCharCount = tempParagraph.length;
-                    }
-                } else {
-                    // 检查是否需要新页
-                    if (currentCharCount + paragraph.length > charsPerPage && currentPage.length > 0) {
-                        pages.push(currentPage);
+                    // 移除Markdown标记来计算实际长度
+                    const plainText = paragraph
+                        .replace(/\*\*(.*?)\*\*/g, '$1')
+                        .replace(/\*(.*?)\*/g, '$1')
+                        .replace(/__(.*?)__/g, '$1')
+                        .replace(/~~(.*?)~~/g, '$1')
+                        .replace(/\[color:#[a-fA-F0-9]{6}\](.*?)\[\/color\]/g, '$1');
+                    // 计算这个段落需要多少行
+                    const linesNeeded = Math.ceil(plainText.length / charsPerLine) || 1;
+                    return {
+                        text: paragraph,
+                        lines: linesNeeded,
+                        isEmptyLine: false
+                    };
+                });
+                // 分页
+                const pages = [];
+                let currentPage = [];
+                let currentPageLines = 0;
+                for (let i = 0; i < processedParagraphs.length; i++) {
+                    const paragraph = processedParagraphs[i];
+                    // 检查当前段落是否能放入当前页
+                    if (currentPageLines + paragraph.lines > maxLinesPerPage && currentPage.length > 0) {
+                        // 当前页已满，创建新页
+                        pages.push(currentPage.map(p => p.text));
                         currentPage = [paragraph];
-                        currentCharCount = paragraph.length;
+                        currentPageLines = paragraph.lines;
                     } else {
+                        // 添加到当前页
                         currentPage.push(paragraph);
-                        currentCharCount += paragraph.length;
+                        currentPageLines += paragraph.lines;
+                    }
+                }
+                // 添加最后一页
+                if (currentPage.length > 0) {
+                    pages.push(currentPage.map(p => p.text));
+                }
+                if (pages.length === 0) {
+                    pages.push(['']);
+                }
+                return pages;
+            } catch (error) {
+                console.error('分页错误:', error);
+                return [['']];
+            }
+        }
+
+        function parseMarkdown(text) {
+            // 1. 先整体识别所有表格块，替换为唯一占位符
+            let tableMap = {};
+            let tableIdx = 0;
+            text = text.replace(/((?:^\s*\|.*\|.*(?:\n|$))+)/gm, function (tableBlock) {
+                const lines = tableBlock.trim().split('\n');
+                if (lines.length < 2) return tableBlock;
+                if (!/^\s*\|?\s*(:?-+:?\s*\|)+\s*$/.test(lines[1])) return tableBlock;
+                const key = `__TABLE_BLOCK_${tableIdx}__`;
+                tableMap[key] = tableBlock;
+                tableIdx++;
+                return key;
+            });
+            // 2. 其它Markdown处理
+            text = text
+                // 处理标题 (必须在其他格式之前处理)
+                .replace(/^### (.*$)/gim, '<h3 style="margin: 0; margin-bottom: 0.3em; font-size: 0.9em; font-weight: bold; color: #333;">$1</h3>')
+                .replace(/^## (.*$)/gim, '<h2 style="margin: 0; margin-bottom: 0.3em; font-size: 1.1em; font-weight: bold; color: #333;">$1</h2>')
+                .replace(/^# (.*$)/gim, '<h1 style="margin: 0; margin-bottom: 0.3em; font-size: 1.2em; font-weight: bold; color: #333;">$1</h1>')
+                // 处理其他格式
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/__(.*?)__/g, '<u>$1</u>')
+                .replace(/~~(.*?)~~/g, '<del>$1</del>')
+                .replace(/\[color:(#[a-fA-F0-9]{6})\](.*?)\[\/color\]/g, '<span style="color:$1">$2</span>');
+            // 3. 替换回表格HTML
+            Object.keys(tableMap).forEach(key => {
+                text = text.replace(key, renderMarkdownTable(tableMap[key].split('\n')));
+            });
+            return text;
+        }
+
+        // 渲染Markdown表格为HTML
+        function renderMarkdownTable(lines) {
+            if (lines.length < 2) return lines.join('<br>');
+            const headerCells = lines[0].split('|').slice(1, -1).map(cell => cell.trim());
+            const rows = lines.slice(2).map(row => row.split('|').slice(1, -1).map(cell => cell.trim()));
+            let html = '<table class="md-table"><thead><tr>';
+            headerCells.forEach(cell => { html += `<th>${parseMarkdown(cell)}</th>`; });
+            html += '</tr></thead><tbody>';
+            rows.forEach(row => {
+                html += '<tr>';
+                row.forEach(cell => { html += `<td>${parseMarkdown(cell)}</td>`; });
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            return html;
+        }
+
+        // 改进的格式化文本函数
+        function formatTextWithParagraphs(lines) {
+            return lines.map((line, index) => {
+                if (line.trim() === '') {
+                    // 空行保持固定高度，但减少高度
+                    return '<p style="margin: 0; height: 0.5em;">&nbsp;</p>';
+                } else {
+                    // 检查是否是标题
+                    const isHeading = /^#{1,3}\s/.test(line);
+
+                    if (isHeading) {
+                        // 标题不需要额外的包装
+                        return parseMarkdown(line);
+                    } else {
+                        // 正常段落，减少段落间距
+                        const marginBottom = index === lines.length - 1 ? '0' : '0.3em';
+                        return `<p style="margin: 0; margin-bottom: ${marginBottom}; text-align: justify; word-break: break-all;">${parseMarkdown(line)}</p>`;
+                    }
+                }
+            }).join('');
+        }
+
+        function getBackgroundColor(colorOption) {
+            switch (colorOption) {
+                case 'cream': return '#FFF8E7';
+                case 'light-pink': return '#FDF2F8';
+                case 'light-blue': return '#EFF6FF';
+                case 'light-green': return '#F0FDF4';
+                case 'light-yellow': return '#FEFCE8';
+                case 'light-purple': return '#FAF5FF';
+                case 'light-gray': return '#F9FAFB';
+                case 'gradient1': return 'linear-gradient(135deg, #FFE0EC 0%, #FFF5E0 100%)';
+                case 'gradient2': return 'linear-gradient(135deg, #E0F0FF 0%, #F0E0FF 100%)';
+                case 'gradient3': return 'linear-gradient(135deg, #F5E0FF 0%, #E0E8FF 100%)';
+                default: return 'white';
+            }
+        }
+
+        function getTextureOverlay(textureOption) {
+            switch (textureOption) {
+                case 'paper':
+                    return 'repeating-linear-gradient(123deg, transparent, transparent 2px, rgba(0,0,0,0.008) 2px, rgba(0,0,0,0.008) 3px), repeating-linear-gradient(27deg, transparent, transparent 1px, rgba(0,0,0,0.005) 1px, rgba(0,0,0,0.005) 2px), radial-gradient(circle at 20% 50%, rgba(0,0,0,0.01) 0%, transparent 50%), radial-gradient(circle at 80% 30%, rgba(0,0,0,0.01) 0%, transparent 50%)';
+                case 'dots':
+                    return 'radial-gradient(circle at 10px 10px, rgba(0,0,0,0.1) 1px, transparent 0), radial-gradient(circle at 10px 10px, rgba(0,0,0,0.1) 1px, transparent 0)';
+                case 'lines':
+                    return 'repeating-linear-gradient(0deg, transparent, transparent 23px, rgba(0,0,0,0.1) 24px)';
+                case 'grid':
+                    return 'repeating-linear-gradient(0deg, transparent, transparent 19px, rgba(0,0,0,0.05) 20px), repeating-linear-gradient(90deg, transparent, transparent 19px, rgba(0,0,0,0.05) 20px)';
+                case 'notebook':
+                    return 'repeating-linear-gradient(0deg, transparent, transparent 23px, rgba(0,0,0,0.1) 24px), linear-gradient(90deg, #ff69b4 80px, #ff69b4 82px, transparent 82px)';
+                case 'memo':
+                    return 'linear-gradient(45deg, rgba(255,255,255,0.1) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.1) 75%), linear-gradient(-45deg, rgba(255,255,255,0.1) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.1) 75%)';
+                default:
+                    return null;
+            }
+        }
+
+        function applyBackground(element, bgColor, bgTexture) {
+            const baseColor = getBackgroundColor(bgColor);
+            element.style.background = baseColor;
+
+            if (bgTexture !== 'none') {
+                const textureOverlay = getTextureOverlay(bgTexture);
+                if (textureOverlay) {
+                    element.style.background = textureOverlay + ', ' + baseColor;
+                    if (bgTexture === 'dots') {
+                        element.style.backgroundSize = '20px 20px, 20px 20px';
+                    } else if (bgTexture === 'memo') {
+                        element.style.backgroundSize = '10px 10px, 10px 10px';
                     }
                 }
             }
+        }
 
-            // 添加最后一页
-            if (currentPage.length > 0) {
-                pages.push(currentPage);
+        function applyPreset() {
+            const preset = document.getElementById('stylePreset').value;
+            const bgColorSelect = document.getElementById('bgColor');
+            const bgTextureSelect = document.getElementById('bgTexture');
+
+            switch (preset) {
+                case 'classic-memo':
+                    bgColorSelect.value = 'light-yellow';
+                    bgTextureSelect.value = 'lines';
+                    break;
+                case 'modern-note':
+                    bgColorSelect.value = 'white';
+                    bgTextureSelect.value = 'dots';
+                    break;
+                case 'vintage-paper':
+                    bgColorSelect.value = 'cream';
+                    bgTextureSelect.value = 'paper';
+                    break;
+                case 'minimal-clean':
+                    bgColorSelect.value = 'white';
+                    bgTextureSelect.value = 'none';
+                    break;
+                case 'warm-journal':
+                    bgColorSelect.value = 'light-pink';
+                    bgTextureSelect.value = 'memo';
+                    break;
             }
-
-            return pages;
         }
 
-        function formatTextWithParagraphs(paragraphs) {
-            return paragraphs.map(p => `<p>${p.trim()}</p>`).join('');
-        }
+        function getAspectRatioDimensions(ratio) {
+            const previewBase = 300;
+            const downloadBase = 900;
 
-        function applyBackground(element, bgStyle) {
-            switch (bgStyle) {
-                case 'cream':
-                    element.style.background = '#FFF8E7';
-                    break;
-                case 'paper':
-                    element.style.background = `
-                        repeating-linear-gradient(
-                            90deg,
-                            #FAFAFA,
-                            #FAFAFA 1px,
-                            #FFF 1px,
-                            #FFF 20px
-                        )`;
-                    break;
-                case 'gradient1':
-                    element.style.background = 'linear-gradient(135deg, #FFE0EC 0%, #FFF5E0 100%)';
-                    break;
-                case 'gradient2':
-                    element.style.background = 'linear-gradient(135deg, #E0F0FF 0%, #F0E0FF 100%)';
-                    break;
-                case 'gradient3':
-                    element.style.background = 'linear-gradient(135deg, #F5E0FF 0%, #E0E8FF 100%)';
-                    break;
+            switch (ratio) {
+                case '1:1':
+                    return {
+                        preview: { width: previewBase, height: previewBase },
+                        download: { width: downloadBase, height: downloadBase }
+                    };
+                case '3:4':
+                    return {
+                        preview: { width: previewBase, height: Math.round(previewBase * 4 / 3) },
+                        download: { width: downloadBase, height: Math.round(downloadBase * 4 / 3) }
+                    };
+                case '4:3':
+                    return {
+                        preview: { width: previewBase, height: Math.round(previewBase * 3 / 4) },
+                        download: { width: downloadBase, height: Math.round(downloadBase * 3 / 4) }
+                    };
+                case '16:9':
+                    return {
+                        preview: { width: previewBase, height: Math.round(previewBase * 9 / 16) },
+                        download: { width: downloadBase, height: Math.round(downloadBase * 9 / 16) }
+                    };
+                case '9:16':
+                    return {
+                        preview: { width: previewBase, height: Math.round(previewBase * 16 / 9) },
+                        download: { width: downloadBase, height: Math.round(downloadBase * 16 / 9) }
+                    };
+                case '2:3':
+                    return {
+                        preview: { width: previewBase, height: Math.round(previewBase * 3 / 2) },
+                        download: { width: downloadBase, height: Math.round(downloadBase * 3 / 2) }
+                    };
+                case 'custom':
+                    const customWidth = parseInt(document.getElementById('customWidth').value) || 900;
+                    const customHeight = parseInt(document.getElementById('customHeight').value) || 1600;
+                    const scale = previewBase / customWidth;
+                    return {
+                        preview: { width: previewBase, height: Math.round(customHeight * scale) },
+                        download: { width: customWidth, height: customHeight }
+                    };
                 default:
-                    element.style.background = 'white';
+                    return {
+                        preview: { width: previewBase, height: Math.round(previewBase * 3 / 2) },
+                        download: { width: downloadBase, height: Math.round(downloadBase * 3 / 2) }
+                    };
             }
         }
 
-        function generatePages() {
+        function updatePreviewSize() {
+            const aspectRatio = document.getElementById('aspectRatio').value;
+            const customOptions = document.getElementById('customSizeOptions');
+
+            customOptions.style.display = aspectRatio === 'custom' ? 'block' : 'none';
+
+            const pagePreviewElements = document.querySelectorAll('.page-preview');
+            const dimensions = getAspectRatioDimensions(aspectRatio);
+
+            pagePreviewElements.forEach(element => {
+                element.style.width = dimensions.preview.width + 'px';
+                element.style.height = dimensions.preview.height + 'px';
+            });
+
             const inputText = document.getElementById('inputText').value;
-            if (!inputText.trim()) {
-                alert('请输入要排版的文本');
+            if (inputText.trim() && currentPages.length > 0) {
+                generatePages();
+            }
+        }
+
+        function updateFontDisplay() {
+            const fontFamily = document.getElementById('fontFamily').value;
+            const customFontUpload = document.getElementById('customFontUpload');
+
+            customFontUpload.style.display = fontFamily === 'custom' ? 'block' : 'none';
+
+            const pageContentElements = document.querySelectorAll('.page-content');
+            pageContentElements.forEach(element => {
+                if (fontFamily === 'default') {
+                    element.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
+                } else if (fontFamily !== 'custom') {
+                    element.style.fontFamily = `"${fontFamily}", -apple-system, BlinkMacSystemFont, sans-serif`;
+                }
+            });
+        }
+
+        function regenerateIfNeeded() {
+            const inputText = document.getElementById('inputText').value;
+            if (inputText.trim() && currentPages.length > 0) {
+                generatePages();
+            }
+        }
+
+        function loadCustomFont() {
+            const fileInput = document.getElementById('fontFile');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert('请选择字体文件');
                 return;
             }
 
-            const charsPerPage = parseInt(document.getElementById('charsPerPage').value);
-            const fontSize = document.getElementById('fontSize').value;
-            const lineHeight = document.getElementById('lineHeight').value;
-            const watermarkText = document.getElementById('watermarkText').value;
-            const bgStyle = document.getElementById('bgStyle').value;
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const fontData = e.target.result;
+                const fontFamily = 'CustomFont_' + Date.now();
 
-            currentPages = splitTextIntoPages(inputText, charsPerPage);
+                const style = document.createElement('style');
+                style.textContent = `
+                    @font-face {
+                        font-family: "${fontFamily}";
+                        src: url(${fontData});
+                    }
+                `;
+                document.head.appendChild(style);
 
-            const previewContainer = document.getElementById('previewContainer');
-            previewContainer.innerHTML = '';
+                const pageContentElements = document.querySelectorAll('.page-content');
+                pageContentElements.forEach(element => {
+                    element.style.fontFamily = `"${fontFamily}", sans-serif`;
+                });
 
-            currentPages.forEach((pageTextArray, index) => {
-                const pageDiv = document.createElement('div');
-                pageDiv.className = 'page-preview';
-                pageDiv.setAttribute('data-page-index', index);
-                applyBackground(pageDiv, bgStyle);
+                alert('字体加载成功！');
+            };
 
-                const contentDiv = document.createElement('div');
-                contentDiv.className = 'page-content';
-                contentDiv.style.fontSize = fontSize + 'px';
-                contentDiv.style.lineHeight = lineHeight;
-                contentDiv.innerHTML = formatTextWithParagraphs(pageTextArray);
+            reader.readAsDataURL(file);
+        }
 
-                const pageNumber = document.createElement('div');
-                pageNumber.className = 'page-number';
-                pageNumber.textContent = `${index + 1}/${currentPages.length}`;
+        function showFontDownloadInfo() {
+            const fontInfo = `
+                <div style="max-width: 500px; text-align: left;">
+                    <h3>免费中文字体资源推荐：</h3>
+                    <br>
+                    <strong>1. 思源字体系列：</strong><br>
+                    • 思源黑体 (Source Han Sans)<br>
+                    • 思源宋体 (Source Han Serif)<br>
+                    • 下载地址：GitHub 搜索 "adobe-fonts"<br>
+                    <br>
+                    <strong>2. 站酷字体系列：</strong><br>
+                    • 站酷高端黑、站酷快乐体、站酷文艺体<br>
+                    • 下载地址：站酷网 (zcool.com.cn)<br>
+                    <br>
+                    <strong>3. 方正字库免费字体：</strong><br>
+                    • 方正黑体、方正楷体、方正仿宋<br>
+                    • 下载地址：方正字库官网<br>
+                    <br>
+                    <strong>4. 文泉驿字体：</strong><br>
+                    • 文泉驿微米黑、文泉驿正黑<br>
+                    • 下载地址：wenq.org<br>
+                    <br>
+                    <strong>使用说明：</strong><br>
+                    1. 下载字体文件(.ttf, .otf格式)<br>
+                    2. 在"字体选择"中选择"上传自定义字体"<br>
+                    3. 点击"选择文件"上传字体<br>
+                    4. 点击"加载字体"即可使用<br>
+                </div>
+            `;
 
-                if (watermarkText) {
-                    const watermark = document.createElement('div');
-                    watermark.className = 'watermark';
-                    watermark.textContent = watermarkText;
-                    pageDiv.appendChild(watermark);
+            const popup = document.createElement('div');
+            popup.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.5);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 10000;
+            `;
+
+            const content = document.createElement('div');
+            content.style.cssText = `
+                background: white;
+                padding: 30px;
+                border-radius: 10px;
+                max-width: 600px;
+                max-height: 80vh;
+                overflow-y: auto;
+                position: relative;
+            `;
+
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = '关闭';
+            closeBtn.style.cssText = `
+                position: absolute;
+                top: 10px;
+                right: 15px;
+                background: #ff2442;
+                color: white;
+                border: none;
+                padding: 5px 10px;
+                border-radius: 3px;
+                cursor: pointer;
+            `;
+            closeBtn.onclick = () => document.body.removeChild(popup);
+
+            content.innerHTML = fontInfo;
+            content.appendChild(closeBtn);
+            popup.appendChild(content);
+            document.body.appendChild(popup);
+        }
+
+        function toggleHeaderOptions() {
+            const enableHeader = document.getElementById('enableHeader').checked;
+            const headerOptions = document.getElementById('headerOptions');
+            const headerStyleOptions = document.getElementById('headerStyleOptions');
+
+            headerOptions.style.display = enableHeader ? 'block' : 'none';
+            headerStyleOptions.style.display = enableHeader ? 'block' : 'none';
+        }
+
+        // 改进的生成页面函数
+        function generatePages() {
+            try {
+                const inputText = document.getElementById('inputText').value;
+
+                if (!inputText || !inputText.trim()) {
+                    alert('请输入要排版的文本');
+                    return;
                 }
 
-                pageDiv.appendChild(contentDiv);
-                pageDiv.appendChild(pageNumber);
+                const fontSize = document.getElementById('fontSize').value;
+                const lineHeight = document.getElementById('lineHeight').value;
+                const watermarkText = document.getElementById('watermarkText').value;
+                const bgColor = document.getElementById('bgColor').value;
+                const bgTexture = document.getElementById('bgTexture').value;
+                const fontFamily = document.getElementById('fontFamily').value;
+                const enableHeader = document.getElementById('enableHeader').checked;
+                const headerText = document.getElementById('headerText').value;
+                const headerStyle = document.getElementById('headerStyle').value;
 
-                pageDiv.onclick = () => {
-                    currentPageIndex = index;
-                    document.querySelectorAll('.page-preview').forEach(p => p.style.border = '1px solid #ddd');
-                    pageDiv.style.border = '2px solid #ff2442';
-                };
+                currentPages = splitTextIntoPages(inputText);
 
-                previewContainer.appendChild(pageDiv);
-            });
+                const previewContainer = document.getElementById('previewContainer');
+                previewContainer.innerHTML = '';
 
-            if (currentPages.length > 0) {
-                document.getElementById('downloadSection').style.display = 'block';
+                const aspectRatio = document.getElementById('aspectRatio').value;
+                const dimensions = getAspectRatioDimensions(aspectRatio);
+
+                currentPages.forEach((pageTextArray, index) => {
+                    const pageDiv = document.createElement('div');
+                    pageDiv.className = 'page-preview';
+                    pageDiv.setAttribute('data-page-index', index);
+                    pageDiv.style.width = dimensions.preview.width + 'px';
+                    pageDiv.style.height = dimensions.preview.height + 'px';
+                    pageDiv.style.position = 'relative';
+                    pageDiv.style.overflow = 'hidden';
+                    applyBackground(pageDiv, bgColor, bgTexture);
+
+                    // 创建内容容器
+                    const contentWrapper = document.createElement('div');
+                    contentWrapper.style.cssText = `
+                        position: absolute;
+                        top: ${enableHeader && headerText.trim() ? '70px' : '30px'};
+                        left: 25px;
+                        right: 25px;
+                        bottom: 55px;
+                        overflow: hidden;
+                    `;
+
+                    // 添加页眉
+                    if (enableHeader && headerText.trim()) {
+                        const headerDiv = document.createElement('div');
+                        headerDiv.className = 'page-header';
+                        headerDiv.style.cssText = `
+                            position: absolute;
+                            top: 0;
+                            left: 0;
+                            right: 0;
+                            padding: 15px 25px;
+                            font-size: ${Math.max(parseInt(fontSize) - 2, 12)}px;
+                            font-weight: bold;
+                            color: #666;
+                            text-align: ${headerStyle};
+                            border-bottom: 1px solid #eee;
+                            background: rgba(255, 255, 255, 0.5);
+                        `;
+
+                        if (fontFamily === 'default') {
+                            headerDiv.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
+                        } else if (fontFamily !== 'custom') {
+                            headerDiv.style.fontFamily = `"${fontFamily}", -apple-system, BlinkMacSystemFont, sans-serif`;
+                        }
+
+                        headerDiv.textContent = headerText;
+                        pageDiv.appendChild(headerDiv);
+                    }
+
+                    // 添加内容
+                    const contentDiv = document.createElement('div');
+                    contentDiv.className = 'page-content';
+                    contentDiv.style.cssText = `
+                        font-size: ${fontSize}px;
+                        line-height: ${lineHeight};
+                        color: #333;
+                        word-wrap: break-word;
+                        word-break: break-all;
+                    `;
+
+                    if (fontFamily === 'default') {
+                        contentDiv.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
+                    } else if (fontFamily !== 'custom') {
+                        contentDiv.style.fontFamily = `"${fontFamily}", -apple-system, BlinkMacSystemFont, sans-serif`;
+                    }
+
+                    contentDiv.innerHTML = formatTextWithParagraphs(pageTextArray);
+                    contentWrapper.appendChild(contentDiv);
+                    pageDiv.appendChild(contentWrapper);
+
+                    // 添加页码
+                    const pageNumber = document.createElement('div');
+                    pageNumber.className = 'page-number';
+                    pageNumber.style.cssText = `
+                        position: absolute;
+                        bottom: 15px;
+                        right: 20px;
+                        color: #999;
+                        font-size: 12px;
+                    `;
+                    pageNumber.textContent = `${index + 1}/${currentPages.length}`;
+                    pageDiv.appendChild(pageNumber);
+
+                    // 添加水印
+                    if (watermarkText) {
+                        const watermark = document.createElement('div');
+                        watermark.className = 'watermark';
+                        watermark.style.cssText = `
+                            position: absolute;
+                            bottom: 15px;
+                            left: 20px;
+                            color: #ccc;
+                            font-size: 12px;
+                        `;
+                        watermark.textContent = watermarkText;
+                        pageDiv.appendChild(watermark);
+                    }
+
+                    // 点击选中效果
+                    pageDiv.onclick = () => {
+                        currentPageIndex = index;
+                        document.querySelectorAll('.page-preview').forEach(p => p.style.border = '1px solid #ddd');
+                        pageDiv.style.border = '2px solid #ff2442';
+                    };
+
+                    previewContainer.appendChild(pageDiv);
+                });
+
+                if (currentPages.length > 0) {
+                    document.getElementById('downloadSection').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('生成页面错误:', error);
+                alert('生成页面时出现错误，请检查您的输入');
             }
         }
 
-        function downloadPage(pageIndex) {
+        // html2canvas下载函数
+        function downloadPageByHtml2Canvas(pageIndex) {
             const pageElement = document.querySelector(`[data-page-index="${pageIndex}"]`);
             if (!pageElement) return;
-
-            const canvas = document.getElementById('canvas');
-            const ctx = canvas.getContext('2d');
-
-            // 设置画布尺寸（小红书推荐 3:4 比例）
-            canvas.width = 900;
-            canvas.height = 1600;
-
-            // 获取背景样式并绘制
-            const bgStyle = document.getElementById('bgStyle').value;
-            switch (bgStyle) {
-                case 'cream':
-                    ctx.fillStyle = '#FFF8E7';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    break;
-                case 'paper':
-                    ctx.fillStyle = '#FAFAFA';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    // 添加纸张纹理效果
-                    ctx.strokeStyle = '#F0F0F0';
-                    ctx.lineWidth = 1;
-                    for (let i = 0; i < canvas.width; i += 20) {
-                        ctx.beginPath();
-                        ctx.moveTo(i, 0);
-                        ctx.lineTo(i, canvas.height);
-                        ctx.stroke();
-                    }
-                    break;
-                case 'gradient1':
-                    const grad1 = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-                    grad1.addColorStop(0, '#FFE0EC');
-                    grad1.addColorStop(1, '#FFF5E0');
-                    ctx.fillStyle = grad1;
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    break;
-                case 'gradient2':
-                    const grad2 = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-                    grad2.addColorStop(0, '#E0F0FF');
-                    grad2.addColorStop(1, '#F0E0FF');
-                    ctx.fillStyle = grad2;
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    break;
-                case 'gradient3':
-                    const grad3 = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-                    grad3.addColorStop(0, '#F5E0FF');
-                    grad3.addColorStop(1, '#E0E8FF');
-                    ctx.fillStyle = grad3;
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    break;
-                default:
-                    ctx.fillStyle = 'white';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-            }
-
-            // 获取页面内容
-            const content = pageElement.querySelector('.page-content').innerHTML;
-            const fontSize = parseInt(document.getElementById('fontSize').value);
-            const lineHeight = parseFloat(document.getElementById('lineHeight').value);
-            const watermarkText = document.getElementById('watermarkText').value;
-
-            // 设置字体
-            ctx.font = `${fontSize * 3}px -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif`;
-            ctx.fillStyle = '#333';
-
-            // 绘制文本
-            const padding = 90;
-            let y = padding + fontSize * 3;
-
-            // 解析HTML并绘制文本
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = content;
-            const paragraphs = tempDiv.querySelectorAll('p');
-
-            paragraphs.forEach((p, pIndex) => {
-                const text = p.textContent;
-                const maxWidth = canvas.width - padding * 2;
-                const words = text.split('');
-                let line = '';
-
-                for (let n = 0; n < words.length; n++) {
-                    const testLine = line + words[n];
-                    const metrics = ctx.measureText(testLine);
-                    const testWidth = metrics.width;
-
-                    if (testWidth > maxWidth && n > 0) {
-                        ctx.fillText(line, padding, y);
-                        line = words[n];
-                        y += fontSize * 3 * lineHeight;
-                    } else {
-                        line = testLine;
-                    }
-                }
-                ctx.fillText(line, padding, y);
-
-                // 段落间距（最后一段不加）
-                if (pIndex < paragraphs.length - 1) {
-                    y += fontSize * 3 * lineHeight * 1.8;
-                }
-            });
-
-            // 绘制页码
-            ctx.font = '36px Arial';
-            ctx.fillStyle = '#999';
-            ctx.textAlign = 'right';
-            ctx.fillText(`${pageIndex + 1}/${currentPages.length}`, canvas.width - 60, canvas.height - 45);
-
-            // 绘制水印
-            if (watermarkText) {
-                ctx.font = '36px Arial';
-                ctx.fillStyle = '#ccc';
-                ctx.textAlign = 'left';
-                ctx.fillText(watermarkText, 60, canvas.height - 45);
-            }
-
-            // 下载图片
-            canvas.toBlob(blob => {
-                const url = URL.createObjectURL(blob);
+            html2canvas(pageElement, {
+                scale: 4, // 提高导出清晰度
+                useCORS: true
+            }).then(canvas => {
+                const url = canvas.toDataURL('image/png');
                 const a = document.createElement('a');
                 a.href = url;
                 a.download = `小红书排版_第${pageIndex + 1}页.png`;
+                document.body.appendChild(a);
                 a.click();
-                URL.revokeObjectURL(url);
+                document.body.removeChild(a);
             });
         }
 
         function downloadCurrentPage() {
-            downloadPage(currentPageIndex);
+            downloadPageByHtml2Canvas(currentPageIndex);
         }
 
         function downloadAllPages() {
             if (confirm(`确定要下载全部 ${currentPages.length} 页吗？`)) {
                 let delay = 0;
                 currentPages.forEach((_, index) => {
-                    setTimeout(() => downloadPage(index), delay);
-                    delay += 500; // 延迟下载，避免浏览器阻止
+                    setTimeout(() => downloadPageByHtml2Canvas(index), delay);
+                    delay += 800;
                 });
             }
         }
@@ -565,14 +1111,186 @@
             currentPageIndex = 0;
         }
 
-        // 示例文本
-        document.getElementById('inputText').value = `这是一个示例文本。小红书是一个生活方式分享平台，用户可以通过图片、视频和文字记录生活点滴，发现美好事物。
+        function insertHeading(level) {
+            const textarea = document.getElementById('inputText');
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const selectedText = textarea.value.substring(start, end);
 
-在这个平台上，你可以找到各种生活灵感。从美食制作到旅行攻略，从护肤心得到穿搭技巧，每个人都能在这里找到自己感兴趣的内容。
+            // 获取当前行的内容
+            const lines = textarea.value.split('\n');
+            let currentLineIndex = 0;
+            let currentPos = 0;
 
-创作者们用心分享着自己的经验和见解。他们通过精美的图片和详细的文字，帮助其他用户解决生活中的各种问题。这种分享精神让小红书成为了一个充满正能量的社区。
+            for (let i = 0; i < lines.length; i++) {
+                if (currentPos <= start && start <= currentPos + lines[i].length) {
+                    currentLineIndex = i;
+                    break;
+                }
+                currentPos += lines[i].length + 1; // +1 for newline
+            }
 
-对于长文创作者来说，如何将大段文字优雅地呈现在小红书上是一个挑战。这个工具就是为了解决这个问题而设计的。它可以帮助你自动将长文分页，并生成适合小红书发布的图片格式。`;
+            if (selectedText) {
+                // 如果有选中的文本，将其转换为标题
+                const replacement = level + ' ' + selectedText;
+                textarea.value = textarea.value.substring(0, start) + replacement + textarea.value.substring(end);
+                textarea.selectionStart = start;
+                textarea.selectionEnd = start + replacement.length;
+            } else {
+                // 如果没有选中文本，在当前行开头插入标题格式
+                const currentLine = lines[currentLineIndex];
+                const lineStart = currentPos;
+                const lineEnd = lineStart + currentLine.length;
+
+                // 检查当前行是否已经是标题
+                if (currentLine.match(/^#{1,3}\s/)) {
+                    // 如果已经是标题，替换标题级别
+                    const newLine = level + ' ' + currentLine.replace(/^#{1,3}\s/, '');
+                    textarea.value = textarea.value.substring(0, lineStart) + newLine + textarea.value.substring(lineEnd);
+                    textarea.selectionStart = lineStart;
+                    textarea.selectionEnd = lineStart + newLine.length;
+                } else {
+                    // 如果不是标题，在行首添加标题格式
+                    const newLine = level + ' ' + currentLine;
+                    textarea.value = textarea.value.substring(0, lineStart) + newLine + textarea.value.substring(lineEnd);
+                    textarea.selectionStart = lineStart + level.length + 1;
+                    textarea.selectionEnd = lineStart + level.length + 1;
+                }
+            }
+            textarea.focus();
+            updatePreview();
+        }
+
+        function insertMarkdown(startTag, endTag) {
+            const textarea = document.getElementById('inputText');
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const selectedText = textarea.value.substring(start, end);
+
+            if (selectedText) {
+                const replacement = startTag + selectedText + endTag;
+                textarea.value = textarea.value.substring(0, start) + replacement + textarea.value.substring(end);
+                textarea.selectionStart = start;
+                textarea.selectionEnd = start + replacement.length;
+            } else {
+                const replacement = startTag + '请输入文字' + endTag;
+                textarea.value = textarea.value.substring(0, start) + replacement + textarea.value.substring(end);
+                textarea.selectionStart = start + startTag.length;
+                textarea.selectionEnd = start + startTag.length + 4;
+            }
+            textarea.focus();
+            updatePreview();
+        }
+
+        function insertColor(color) {
+            const textarea = document.getElementById('inputText');
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const selectedText = textarea.value.substring(start, end);
+
+            const startTag = `[color:${color}]`;
+            const endTag = '[/color]';
+
+            if (selectedText) {
+                const replacement = startTag + selectedText + endTag;
+                textarea.value = textarea.value.substring(0, start) + replacement + textarea.value.substring(end);
+                textarea.selectionStart = start;
+                textarea.selectionEnd = start + replacement.length;
+            } else {
+                const replacement = startTag + '请输入文字' + endTag;
+                textarea.value = textarea.value.substring(0, start) + replacement + textarea.value.substring(end);
+                textarea.selectionStart = start + startTag.length;
+                textarea.selectionEnd = start + startTag.length + 4;
+            }
+            textarea.focus();
+            updatePreview();
+        }
+
+        function togglePreview() {
+            const preview = document.getElementById('markdownPreview');
+            if (preview.style.display === 'none') {
+                preview.style.display = 'block';
+                updatePreview();
+            } else {
+                preview.style.display = 'none';
+            }
+        }
+
+        function updatePreview() {
+            const inputText = document.getElementById('inputText').value;
+            const previewContent = document.getElementById('previewContent');
+            const preview = document.getElementById('markdownPreview');
+
+            if (preview.style.display !== 'none') {
+                previewContent.innerHTML = parseMarkdown(inputText.replace(/\n/g, '<br>'));
+            }
+        }
+
+        // DOMContentLoaded 事件监听器
+        document.addEventListener('DOMContentLoaded', function () {
+            // 设置示例文本
+            const inputText = document.getElementById('inputText');
+            if (inputText) {
+                inputText.value = `# 小红书长文排版工具使用指南
+
+这是一个**示例文本**。小红书是一个生活方式分享平台，用户可以通过图片、视频和文字记录生活点滴，发现美好事物。
+
+## 平台特色
+
+在这个平台上，你可以找到各种*生活灵感*。从[color:#ff4757]美食制作[/color]到旅行攻略，从护肤心得到穿搭技巧，每个人都能在这里找到自己感兴趣的内容。
+
+### 创作者分享
+
+创作者们用心分享着自己的经验和见解。他们通过__精美的图片__和详细的文字，帮助其他用户解决生活中的各种问题。
+
+这种分享精神让小红书成为了一个充满正能量的社区。
+
+## 长文排版挑战
+
+对于长文创作者来说，如何将大段文字优雅地呈现在小红书上是一个~~挑战~~**机会**。
+
+### 解决方案
+
+这个工具就是为了解决这个问题而设计的。它会自动分页确保内容不会覆盖水印和页码。你可以用回车来控制段落间距，创造你想要的视觉效果。
+
+## 使用技巧
+
+• 使用标题按钮快速添加标题格式
+• 支持 **加粗**、*斜体*、__下划线__、~~删除线~~
+• 支持颜色标记：[color:#ff4757]红色文字[/color]
+• 自动分页，智能排版`;
+            }
+
+            // 设置事件监听器
+            const textarea = document.getElementById('inputText');
+            if (textarea) {
+                textarea.addEventListener('input', updatePreview);
+            }
+
+            const fontSelect = document.getElementById('fontFamily');
+            if (fontSelect) {
+                fontSelect.addEventListener('change', updateFontDisplay);
+            }
+
+            const fontSizeInput = document.getElementById('fontSize');
+            if (fontSizeInput) {
+                fontSizeInput.addEventListener('change', regenerateIfNeeded);
+            }
+
+            const lineHeightInput = document.getElementById('lineHeight');
+            if (lineHeightInput) {
+                lineHeightInput.addEventListener('change', regenerateIfNeeded);
+            }
+
+            // 延迟自动生成预览，确保所有元素都已加载
+            setTimeout(() => {
+                try {
+                    generatePages();
+                } catch (e) {
+                    console.error('自动生成预览失败:', e);
+                }
+            }, 500);
+        });
     </script>
 </body>
 
