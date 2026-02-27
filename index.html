@@ -325,6 +325,22 @@
                         px
                     </div>
                     <div class="setting-item">
+                        <label>当前图片宽度：</label>
+                        <input type="number" id="selectedImageWidth" value="100" min="20" max="100" title="当前选中图片宽度"
+                            aria-label="当前图片宽度">
+                        %
+                        <button type="button" onclick="applySelectedImageStyle()" class="toolbar-btn" style="margin-left:8px;">应用</button>
+                    </div>
+                    <div class="setting-item">
+                        <label>当前图片对齐：</label>
+                        <select id="selectedImageAlign" title="当前选中图片对齐" aria-label="当前选中图片对齐"
+                            style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 200px;">
+                            <option value="left">左对齐</option>
+                            <option value="center" selected>居中</option>
+                            <option value="right">右对齐</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
                         <label>行高：</label>
                         <input type="number" id="lineHeight" value="1.8" min="1.2" max="2.5" step="0.1" title="设置行高"
                             aria-label="行高">
@@ -461,6 +477,7 @@
                         <li>支持图片：点击“🖼️ 插图”上传本地图片，或使用 ![说明](图片URL)</li>
                         <li>图片可在预览区内拖拽微调位置（按住图片拖动）</li>
                         <li>图片位置会自动持久化，重新生成后仍保留（同一浏览器）</li>
+                        <li>点击图片可单独设置宽度和对齐（左/中/右）</li>
                         <li>可使用工具栏快速添加格式，或手动编写Markdown</li>
                         <li>标题功能：点击H1/H2/H3按钮快速添加标题，或手动输入#、##、###</li>
                         <li>点击"切换预览"查看格式效果</li>
@@ -488,6 +505,8 @@
         let currentPages = [];
         let currentPageIndex = 0;
         let imagePositionMap = {};
+        let imageStyleMap = {};
+        let selectedImageKey = null;
 
         // 恢复最初的分页函数：段落整体分页，不分行填满
         function splitTextIntoPages(text) {
@@ -1145,22 +1164,80 @@
             }
         }
 
+        function saveImageStylesToStorage() {
+            try {
+                localStorage.setItem('xhs_image_styles_v1', JSON.stringify(imageStyleMap));
+            } catch (e) {
+                console.warn('保存图片样式失败:', e);
+            }
+        }
+
+        function loadImageStylesFromStorage() {
+            try {
+                const raw = localStorage.getItem('xhs_image_styles_v1');
+                if (raw) imageStyleMap = JSON.parse(raw) || {};
+            } catch (e) {
+                console.warn('读取图片样式失败:', e);
+                imageStyleMap = {};
+            }
+        }
+
         function applySavedImagePositions(container, pageIndex) {
             const images = container.querySelectorAll('.md-inline-image');
             images.forEach((img, idx) => {
                 const key = getImagePositionKey(pageIndex, idx, img);
+                img.dataset.styleKey = key;
+
                 const pos = imagePositionMap[key];
                 if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.y)) {
                     img.dataset.tx = String(pos.x);
                     img.dataset.ty = String(pos.y);
                     img.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
                 }
+
+                const styleCfg = imageStyleMap[key];
+                if (styleCfg) {
+                    if (styleCfg.widthPct) img.style.maxWidth = `${styleCfg.widthPct}%`;
+                    const wrap = img.closest('.md-image-wrap');
+                    if (wrap && styleCfg.align) wrap.style.textAlign = styleCfg.align;
+                }
             });
+        }
+
+        function selectImageForEditing(img) {
+            document.querySelectorAll('.md-inline-image').forEach(el => {
+                el.style.outline = '';
+            });
+            img.style.outline = '2px solid #ff2442';
+            selectedImageKey = img.dataset.styleKey || null;
+
+            const styleCfg = selectedImageKey ? imageStyleMap[selectedImageKey] : null;
+            const widthInput = document.getElementById('selectedImageWidth');
+            const alignInput = document.getElementById('selectedImageAlign');
+            if (widthInput) widthInput.value = styleCfg?.widthPct || 100;
+            if (alignInput) alignInput.value = styleCfg?.align || 'center';
+        }
+
+        function applySelectedImageStyle() {
+            if (!selectedImageKey) {
+                alert('请先在预览区点击一张图片再应用样式');
+                return;
+            }
+            const widthPct = Math.max(20, Math.min(100, parseInt(document.getElementById('selectedImageWidth')?.value || '100')));
+            const align = document.getElementById('selectedImageAlign')?.value || 'center';
+            imageStyleMap[selectedImageKey] = { widthPct, align };
+            saveImageStylesToStorage();
+            generatePages();
         }
 
         function enableImageDrag(container, pageIndex) {
             const images = container.querySelectorAll('.md-inline-image');
             images.forEach((img, imgIndex) => {
+                img.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    selectImageForEditing(img);
+                });
+
                 img.addEventListener('mousedown', function (e) {
                     e.preventDefault();
                     const startX = e.clientX;
@@ -1375,6 +1452,7 @@
             // 设置示例文本
             const inputText = document.getElementById('inputText');
             loadImagePositionsFromStorage();
+            loadImageStylesFromStorage();
 
             if (inputText) {
                 inputText.value = `# 小红书长文排版工具使用指南
