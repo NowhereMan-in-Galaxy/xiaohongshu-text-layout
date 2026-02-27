@@ -459,6 +459,7 @@
                         <li>内容保护：页面容量智能计算，避免内容超出范围</li>
                         <li>支持Markdown格式：# 一级标题 ## 二级标题 ### 三级标题 **加粗** *斜体* __下划线__ [color:#ff0000]红色[/color]</li>
                         <li>支持图片：点击“🖼️ 插图”上传本地图片，或使用 ![说明](图片URL)</li>
+                        <li>图片可在预览区内拖拽微调位置（按住图片拖动）</li>
                         <li>可使用工具栏快速添加格式，或手动编写Markdown</li>
                         <li>标题功能：点击H1/H2/H3按钮快速添加标题，或手动输入#、##、###</li>
                         <li>点击"切换预览"查看格式效果</li>
@@ -602,7 +603,7 @@
                     const safeAlt = (alt || '').replace(/["<>]/g, '');
                     const safeSrc = (src || '').trim();
                     const imageMaxHeight = parseInt(document.getElementById('imageMaxHeight')?.value || '180');
-                    return `<div class="md-image-wrap" style="margin: 0.5em 0; text-align:center;"><img class="md-inline-image" src="${safeSrc}" alt="${safeAlt}" style="max-width:100%; max-height:${imageMaxHeight}px; width:auto; height:auto; object-fit:contain; border-radius:8px; display:inline-block;" loading="lazy" /></div>`;
+                    return `<div class="md-image-wrap" style="margin: 0.5em 0; text-align:center; position:relative; overflow:hidden;"><img class="md-inline-image" src="${safeSrc}" alt="${safeAlt}" style="max-width:100%; max-height:${imageMaxHeight}px; width:auto; height:auto; object-fit:contain; border-radius:8px; display:inline-block; position:relative; cursor:grab;" loading="lazy" /></div>`;
                 })
                 // 处理其他格式
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
@@ -1045,6 +1046,7 @@
                     }
 
                     contentDiv.innerHTML = formatTextWithParagraphs(pageTextArray);
+                    enableImageDrag(contentDiv);
                     contentWrapper.appendChild(contentDiv);
                     pageDiv.appendChild(contentWrapper);
 
@@ -1115,6 +1117,40 @@
 
         function downloadCurrentPage() {
             downloadPageByHtml2Canvas(currentPageIndex);
+        }
+
+        function enableImageDrag(container) {
+            const images = container.querySelectorAll('.md-inline-image');
+            images.forEach(img => {
+                img.addEventListener('mousedown', function (e) {
+                    e.preventDefault();
+                    const startX = e.clientX;
+                    const startY = e.clientY;
+                    const prevX = parseFloat(img.dataset.tx || '0');
+                    const prevY = parseFloat(img.dataset.ty || '0');
+
+                    img.style.cursor = 'grabbing';
+
+                    function onMove(ev) {
+                        const dx = ev.clientX - startX;
+                        const dy = ev.clientY - startY;
+                        const tx = prevX + dx;
+                        const ty = prevY + dy;
+                        img.dataset.tx = String(tx);
+                        img.dataset.ty = String(ty);
+                        img.style.transform = `translate(${tx}px, ${ty}px)`;
+                    }
+
+                    function onUp() {
+                        img.style.cursor = 'grab';
+                        document.removeEventListener('mousemove', onMove);
+                        document.removeEventListener('mouseup', onUp);
+                    }
+
+                    document.addEventListener('mousemove', onMove);
+                    document.addEventListener('mouseup', onUp);
+                });
+            });
         }
 
         function downloadAllPages() {
