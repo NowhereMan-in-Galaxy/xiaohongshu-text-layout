@@ -288,6 +288,8 @@
                     <button class="toolbar-btn" onclick="insertMarkdown('*', '*')" title="斜体"><em>I</em> 斜体</button>
                     <button class="toolbar-btn" onclick="insertMarkdown('__', '__')" title="下划线"><u>U</u> 下划线</button>
                     <button class="toolbar-btn" onclick="insertMarkdown('~~', '~~')" title="删除线"><s>S</s> 删除线</button>
+                    <button class="toolbar-btn" onclick="triggerImageUpload()" title="插入图片">🖼️ 插图</button>
+                    <input type="file" id="inlineImageUpload" accept="image/*" style="display:none;" onchange="handleInlineImageUpload(event)">
                     <div class="color-selector">
                         <div class="color-btn" style="background: #ff4757;" onclick="insertColor('#ff4757')" title="红色">
                         </div>
@@ -314,6 +316,12 @@
                         <label>字体大小：</label>
                         <input type="number" id="fontSize" value="13" min="12" max="20" title="设置字体大小"
                             aria-label="字体大小">
+                        px
+                    </div>
+                    <div class="setting-item">
+                        <label>图片最大高度：</label>
+                        <input type="number" id="imageMaxHeight" value="180" min="80" max="420" title="正文图片最大高度"
+                            aria-label="图片最大高度">
                         px
                     </div>
                     <div class="setting-item">
@@ -450,6 +458,7 @@
                         <li>回车控制：使用回车控制段落间距和空白，多个回车创建更多空白</li>
                         <li>内容保护：页面容量智能计算，避免内容超出范围</li>
                         <li>支持Markdown格式：# 一级标题 ## 二级标题 ### 三级标题 **加粗** *斜体* __下划线__ [color:#ff0000]红色[/color]</li>
+                        <li>支持图片：点击“🖼️ 插图”上传本地图片，或使用 ![说明](图片URL)</li>
                         <li>可使用工具栏快速添加格式，或手动编写Markdown</li>
                         <li>标题功能：点击H1/H2/H3按钮快速添加标题，或手动输入#、##、###</li>
                         <li>点击"切换预览"查看格式效果</li>
@@ -502,30 +511,38 @@
                 const lineHeightPx = fontSize * lineHeight;
                 const maxLinesPerPage = Math.max(1, Math.floor(availableHeight / lineHeightPx) - 1);
                 const charsPerLine = Math.floor(availableWidth / (fontSize * 0.9));
+                const imageMaxHeight = parseInt(document.getElementById('imageMaxHeight')?.value || '180');
 
                 const paragraphs = text.split('\n');
-                // 处理每个段落，计算实际占用的行数
+                // 处理每个段落，计算实际占用的行数（包含图片块）
                 const processedParagraphs = paragraphs.map(paragraph => {
                     if (paragraph.trim() === '') {
-                        // 空行占一行
                         return {
                             text: '',
                             lines: 1,
                             isEmptyLine: true
                         };
                     }
-                    // 移除Markdown标记来计算实际长度
+
+                    const imageMatches = paragraph.match(/!\[[^\]]*\]\(([^)]+)\)/g) || [];
+                    const imageLines = imageMatches.length > 0
+                        ? imageMatches.length * Math.ceil((imageMaxHeight + 16) / lineHeightPx)
+                        : 0;
+
                     const plainText = paragraph
+                        .replace(/!\[[^\]]*\]\(([^)]+)\)/g, '')
                         .replace(/\*\*(.*?)\*\*/g, '$1')
                         .replace(/\*(.*?)\*/g, '$1')
                         .replace(/__(.*?)__/g, '$1')
                         .replace(/~~(.*?)~~/g, '$1')
                         .replace(/\[color:#[a-fA-F0-9]{6}\](.*?)\[\/color\]/g, '$1');
-                    // 计算这个段落需要多少行
-                    const linesNeeded = Math.ceil(plainText.length / charsPerLine) || 1;
+
+                    const textLines = Math.ceil(Math.max(plainText.length, 1) / charsPerLine) || 1;
+                    const linesNeeded = textLines + imageLines;
+
                     return {
                         text: paragraph,
-                        lines: linesNeeded,
+                        lines: Math.max(linesNeeded, 1),
                         isEmptyLine: false
                     };
                 });
@@ -580,6 +597,13 @@
                 .replace(/^### (.*$)/gim, '<h3 style="margin: 0; margin-bottom: 0.3em; font-size: 0.9em; font-weight: bold; color: #333;">$1</h3>')
                 .replace(/^## (.*$)/gim, '<h2 style="margin: 0; margin-bottom: 0.3em; font-size: 1.1em; font-weight: bold; color: #333;">$1</h2>')
                 .replace(/^# (.*$)/gim, '<h1 style="margin: 0; margin-bottom: 0.3em; font-size: 1.2em; font-weight: bold; color: #333;">$1</h1>')
+                // 处理图片（Markdown）
+                .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, function (_, alt, src) {
+                    const safeAlt = (alt || '').replace(/["<>]/g, '');
+                    const safeSrc = (src || '').trim();
+                    const imageMaxHeight = parseInt(document.getElementById('imageMaxHeight')?.value || '180');
+                    return `<div class="md-image-wrap" style="margin: 0.5em 0; text-align:center;"><img class="md-inline-image" src="${safeSrc}" alt="${safeAlt}" style="max-width:100%; max-height:${imageMaxHeight}px; width:auto; height:auto; object-fit:contain; border-radius:8px; display:inline-block;" loading="lazy" /></div>`;
+                })
                 // 处理其他格式
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                 .replace(/\*(.*?)\*/g, '<em>$1</em>')
@@ -1206,6 +1230,45 @@
             updatePreview();
         }
 
+        function triggerImageUpload() {
+            const imageInput = document.getElementById('inlineImageUpload');
+            if (imageInput) imageInput.click();
+        }
+
+        function handleInlineImageUpload(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+            if (!file.type.startsWith('image/')) {
+                alert('请选择图片文件');
+                return;
+            }
+            if (file.size > 8 * 1024 * 1024) {
+                alert('图片过大，请选择 8MB 以内图片');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const imageUrl = e.target.result;
+                const textarea = document.getElementById('inputText');
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const markdownImage = `\n![图片](${imageUrl})\n`;
+
+                textarea.value = textarea.value.substring(0, start) + markdownImage + textarea.value.substring(end);
+                const cursor = start + markdownImage.length;
+                textarea.selectionStart = cursor;
+                textarea.selectionEnd = cursor;
+                textarea.focus();
+                updatePreview();
+                regenerateIfNeeded();
+            };
+            reader.readAsDataURL(file);
+
+            // reset input to allow same file re-upload
+            event.target.value = '';
+        }
+
         function togglePreview() {
             const preview = document.getElementById('markdownPreview');
             if (preview.style.display === 'none') {
@@ -1280,6 +1343,11 @@
             const lineHeightInput = document.getElementById('lineHeight');
             if (lineHeightInput) {
                 lineHeightInput.addEventListener('change', regenerateIfNeeded);
+            }
+
+            const imageMaxHeightInput = document.getElementById('imageMaxHeight');
+            if (imageMaxHeightInput) {
+                imageMaxHeightInput.addEventListener('change', regenerateIfNeeded);
             }
 
             // 延迟自动生成预览，确保所有元素都已加载
