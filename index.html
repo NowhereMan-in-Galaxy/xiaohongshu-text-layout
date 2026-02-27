@@ -633,7 +633,7 @@
                     const safeAlt = (alt || '').replace(/["<>]/g, '');
                     const safeSrc = (src || '').trim();
                     const imageMaxHeight = parseInt(document.getElementById('imageMaxHeight')?.value || '180');
-                    return `<div class="md-image-wrap" style="margin: 0.5em 0; text-align:center; position:relative; overflow:hidden;"><img class="md-inline-image" src="${safeSrc}" alt="${safeAlt}" style="max-width:100%; max-height:${imageMaxHeight}px; width:auto; height:auto; object-fit:contain; border-radius:8px; display:inline-block; position:relative; cursor:grab;" loading="lazy" /></div>`;
+                    return `<div class="md-image-wrap" style="margin: 0.5em 0; text-align:center; position:relative;"><img class="md-inline-image" src="${safeSrc}" alt="${safeAlt}" style="max-width:100%; max-height:${imageMaxHeight}px; width:auto; height:auto; object-fit:contain; border-radius:8px; display:inline-block; position:relative; cursor:grab; user-select:none;" loading="lazy" draggable="false" /></div>`;
                 })
                 // 处理其他格式
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
