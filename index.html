@@ -1177,13 +1177,9 @@
         }
 
         function loadImagePositionsFromStorage() {
-            try {
-                const raw = localStorage.getItem('xhs_image_positions_v2');
-                if (raw) imagePositionMap = JSON.parse(raw) || {};
-            } catch (e) {
-                console.warn('读取图片位置失败:', e);
-                imagePositionMap = {};
-            }
+            // 临时策略：禁用历史拖拽位置恢复，避免旧偏移导致图片不可见
+            imagePositionMap = {};
+            try { localStorage.removeItem('xhs_image_positions_v2'); } catch (e) { }
         }
 
         function saveImageStylesToStorage() {
