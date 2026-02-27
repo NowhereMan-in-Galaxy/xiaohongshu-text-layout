@@ -1218,9 +1218,20 @@
 
                 const pos = imagePositionMap[key];
                 if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.y)) {
-                    img.dataset.tx = String(pos.x);
-                    img.dataset.ty = String(pos.y);
-                    img.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
+                    const pageEl = img.closest('.page-preview');
+                    const maxX = (pageEl?.clientWidth || 300) * 0.9;
+                    const maxY = (pageEl?.clientHeight || 500) * 0.9;
+                    const safeX = Math.max(-maxX, Math.min(maxX, pos.x));
+                    const safeY = Math.max(-maxY, Math.min(maxY, pos.y));
+
+                    img.dataset.tx = String(safeX);
+                    img.dataset.ty = String(safeY);
+                    img.style.transform = `translate(${safeX}px, ${safeY}px)`;
+
+                    if (safeX !== pos.x || safeY !== pos.y) {
+                        imagePositionMap[key] = { x: safeX, y: safeY };
+                        saveImagePositionsToStorage();
+                    }
                 }
 
                 const styleCfg = imageStyleMap[key];
