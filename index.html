@@ -1258,6 +1258,58 @@
             generatePages();
         }
 
+        function getPageIndexFromPoint(clientX, clientY) {
+            const pages = document.querySelectorAll('.page-preview');
+            for (let i = 0; i < pages.length; i++) {
+                const rect = pages[i].getBoundingClientRect();
+                if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
+                    return parseInt(pages[i].getAttribute('data-page-index') || String(i));
+                }
+            }
+            return null;
+        }
+
+        function moveImageMarkdownToPage(imageSrc, sourcePageIndex, targetPageIndex) {
+            if (targetPageIndex === null || targetPageIndex === undefined || sourcePageIndex === targetPageIndex) return false;
+            const textarea = document.getElementById('inputText');
+            const lines = textarea.value.split('\n');
+
+            let imageMarkdown = null;
+            let removedLineIndex = -1;
+            for (let i = 0; i < lines.length; i++) {
+                const matches = lines[i].match(/!\[[^\]]*\]\(([^)]+)\)/g) || [];
+                for (const md of matches) {
+                    const srcMatch = md.match(/!\[[^\]]*\]\(([^)]+)\)/);
+                    if (srcMatch && srcMatch[1] === imageSrc) {
+                        imageMarkdown = md;
+                        lines[i] = lines[i].replace(md, '').trim();
+                        removedLineIndex = i;
+                        break;
+                    }
+                }
+                if (imageMarkdown) break;
+            }
+            if (!imageMarkdown) return false;
+
+            const normalized = [];
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i] === '' && normalized.length > 0 && normalized[normalized.length - 1] === '') continue;
+                normalized.push(lines[i]);
+            }
+
+            const pageLengths = currentPages.map(p => p.length);
+            let insertAt = 0;
+            for (let p = 0; p <= targetPageIndex && p < pageLengths.length; p++) {
+                insertAt += pageLengths[p];
+            }
+
+            const adjustedInsertAt = removedLineIndex !== -1 && removedLineIndex < insertAt ? Math.max(0, insertAt - 1) : insertAt;
+            normalized.splice(Math.min(adjustedInsertAt, normalized.length), 0, imageMarkdown);
+
+            textarea.value = normalized.join('\n');
+            return true;
+        }
+
         function enableImageDrag(container, pageIndex) {
             const images = container.querySelectorAll('.md-inline-image');
             images.forEach((img, imgIndex) => {
@@ -1286,11 +1338,24 @@
                         img.style.transform = `translate(${tx}px, ${ty}px)`;
                     }
 
-                    function onUp() {
+                    function onUp(ev) {
                         const finalX = parseFloat(img.dataset.tx || '0');
                         const finalY = parseFloat(img.dataset.ty || '0');
                         imagePositionMap[key] = { x: finalX, y: finalY };
                         saveImagePositionsToStorage();
+
+                        const targetPageIndex = getPageIndexFromPoint(ev.clientX, ev.clientY);
+                        const imageSrc = img.getAttribute('src') || '';
+                        if (targetPageIndex !== null && targetPageIndex !== pageIndex && imageSrc) {
+                            const moved = moveImageMarkdownToPage(imageSrc, pageIndex, targetPageIndex);
+                            if (moved) {
+                                img.style.cursor = 'grab';
+                                document.removeEventListener('mousemove', onMove);
+                                document.removeEventListener('mouseup', onUp);
+                                generatePages();
+                                return;
+                            }
+                        }
 
                         img.style.cursor = 'grab';
                         document.removeEventListener('mousemove', onMove);
