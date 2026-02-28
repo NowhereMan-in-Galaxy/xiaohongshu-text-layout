@@ -478,7 +478,7 @@
                         <li>回车控制：使用回车控制段落间距和空白，多个回车创建更多空白</li>
                         <li>内容保护：页面容量智能计算，避免内容超出范围</li>
                         <li>支持Markdown格式：# 一级标题 ## 二级标题 ### 三级标题 **加粗** *斜体* __下划线__ [color:#ff0000]红色[/color]</li>
-                        <li>支持图片：点击“🖼️ 插图”上传本地图片，或使用 ![说明](图片URL)</li>
+                        <li>支持图片：点击“🖼️ 插图”上传本地图片（编辑器显示 [[IMG:xxxx]] 占位符），或使用 ![说明](图片URL)</li>
                         <li>图片可在预览区内拖拽微调位置（按住图片拖动）</li>
                         <li>图片位置会自动持久化，重新生成后仍保留（同一浏览器）</li>
                         <li>点击图片可单独设置宽度和对齐（左/中/右）</li>
@@ -512,7 +512,10 @@
         let currentPageIndex = 0;
         let imagePositionMap = {};
         let imageStyleMap = {};
+        let imageAssetMap = {};
         let selectedImageKey = null;
+
+        const IMAGE_TOKEN_REGEX = /\[\[IMG:([a-zA-Z0-9_-]+)\]\]/g;
 
         // ---- Refactor Stage 1: shared settings/helpers ----
         function readLayoutOptions() {
@@ -549,12 +552,25 @@
             return Math.max(80, Math.min(baseMaxHeight, adaptiveCap));
         }
 
-        function renderMarkdownImageTag(alt, src) {
+        function getImageTokenText(tokenId) {
+            return `[[IMG:${tokenId}]]`;
+        }
+
+        function getImageDisplayPlaceholder(tokenId) {
+            return `【🖼️图片:${tokenId}】`;
+        }
+
+        function resolveImageSrcByToken(tokenId) {
+            return imageAssetMap[tokenId] || '';
+        }
+
+        function renderMarkdownImageTag(alt, src, tokenId = '') {
             const safeAlt = (alt || '').replace(/["<>]/g, '');
             const safeSrc = (src || '').trim();
+            const safeToken = (tokenId || '').replace(/["<>]/g, '');
             const { imageMaxHeight } = readLayoutOptions();
             const adaptiveImageMaxHeight = getAdaptiveImageMaxHeight(imageMaxHeight);
-            return `<div class="md-image-wrap" style="margin: 0.5em 0; text-align:center; position:relative;"><img class="md-inline-image" src="${safeSrc}" alt="${safeAlt}" style="max-width:100%; max-height:${adaptiveImageMaxHeight}px; width:auto; height:auto; object-fit:contain; border-radius:8px; display:inline-block; position:relative; cursor:grab; user-select:none;" loading="eager" draggable="false" /></div>`;
+            return `<div class="md-image-wrap" style="margin: 0.5em 0; text-align:center; position:relative;"><img class="md-inline-image" data-img-token="${safeToken}" src="${safeSrc}" alt="${safeAlt}" style="max-width:100%; max-height:${adaptiveImageMaxHeight}px; width:auto; height:auto; object-fit:contain; border-radius:8px; display:inline-block; position:relative; cursor:grab; user-select:none;" loading="eager" draggable="false" /></div>`;
         }
 
         // 恢复最初的分页函数：段落整体分页，不分行填满
@@ -593,11 +609,14 @@
                     }
 
                     const imageMatches = paragraph.match(/!\[[^\]]*\]\(([^)]+)\)/g) || [];
-                    const imageLines = imageMatches.length > 0
-                        ? imageMatches.length * Math.ceil((adaptiveImageMaxHeight + 16) / lineHeightPx)
+                    const imageTokenMatches = paragraph.match(IMAGE_TOKEN_REGEX) || [];
+                    const imageCount = imageMatches.length + imageTokenMatches.length;
+                    const imageLines = imageCount > 0
+                        ? imageCount * Math.ceil((adaptiveImageMaxHeight + 16) / lineHeightPx)
                         : 0;
 
                     const plainText = paragraph
+                        .replace(IMAGE_TOKEN_REGEX, '')
                         .replace(/!\[[^\]]*\]\(([^)]+)\)/g, '')
                         .replace(/\*\*(.*?)\*\*/g, '$1')
                         .replace(/\*(.*?)\*/g, '$1')
@@ -665,6 +684,14 @@
                 .replace(/^### (.*$)/gim, '<h3 style="margin: 0; margin-bottom: 0.3em; font-size: 0.9em; font-weight: bold; color: #333;">$1</h3>')
                 .replace(/^## (.*$)/gim, '<h2 style="margin: 0; margin-bottom: 0.3em; font-size: 1.1em; font-weight: bold; color: #333;">$1</h2>')
                 .replace(/^# (.*$)/gim, '<h1 style="margin: 0; margin-bottom: 0.3em; font-size: 1.2em; font-weight: bold; color: #333;">$1</h1>')
+                // 处理图片（Token 占位）
+                .replace(IMAGE_TOKEN_REGEX, function (_, tokenId) {
+                    const src = resolveImageSrcByToken(tokenId);
+                    if (!src) {
+                        return `<span style="background:#fff0b3;color:#7a5f00;padding:2px 6px;border-radius:6px;">${getImageDisplayPlaceholder(tokenId)}</span>`;
+                    }
+                    return renderMarkdownImageTag('图片', src, tokenId);
+                })
                 // 处理图片（Markdown）
                 .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, function (_, alt, src) {
                     return renderMarkdownImageTag(alt, src);
@@ -1234,6 +1261,24 @@
             }
         }
 
+        function saveImageAssetsToStorage() {
+            try {
+                localStorage.setItem('xhs_image_assets_v1', JSON.stringify(imageAssetMap));
+            } catch (e) {
+                console.warn('保存图片资源失败:', e);
+            }
+        }
+
+        function loadImageAssetsFromStorage() {
+            try {
+                const raw = localStorage.getItem('xhs_image_assets_v1');
+                if (raw) imageAssetMap = JSON.parse(raw) || {};
+            } catch (e) {
+                console.warn('读取图片资源失败:', e);
+                imageAssetMap = {};
+            }
+        }
+
         function applySavedImagePositions(container, pageIndex) {
             const images = container.querySelectorAll('.md-inline-image');
             images.forEach((img, idx) => {
@@ -1267,6 +1312,18 @@
             });
         }
 
+        function highlightImageTokenInEditor(tokenId) {
+            if (!tokenId) return;
+            const textarea = document.getElementById('inputText');
+            if (!textarea) return;
+            const tokenText = getImageTokenText(tokenId);
+            const idx = textarea.value.indexOf(tokenText);
+            if (idx >= 0) {
+                textarea.focus();
+                textarea.setSelectionRange(idx, idx + tokenText.length);
+            }
+        }
+
         function selectImageForEditing(img) {
             document.querySelectorAll('.md-inline-image').forEach(el => {
                 el.style.outline = '';
@@ -1279,6 +1336,9 @@
             const alignInput = document.getElementById('selectedImageAlign');
             if (widthInput) widthInput.value = styleCfg?.widthPct || 100;
             if (alignInput) alignInput.value = styleCfg?.align || 'center';
+
+            const tokenId = img.dataset.imgToken || '';
+            highlightImageTokenInEditor(tokenId);
         }
 
         function applySelectedImageStyle() {
@@ -1348,6 +1408,45 @@
             const ratio = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
             const pageLen = (currentPages[targetPageIndex] || []).length;
             return Math.max(0, Math.min(pageLen, Math.round(pageLen * ratio)));
+        }
+
+        function moveImageTokenToPage(tokenId, sourcePageIndex, targetPageIndex, targetOffsetInPage = null) {
+            if (!tokenId) return false;
+            if (targetPageIndex === null || targetPageIndex === undefined || sourcePageIndex === targetPageIndex) return false;
+            const textarea = document.getElementById('inputText');
+            const lines = textarea.value.split('\n');
+            const tokenText = getImageTokenText(tokenId);
+
+            let removedLineIndex = -1;
+            for (let i = 0; i < lines.length; i++) {
+                const idx = lines[i].indexOf(tokenText);
+                if (idx >= 0) {
+                    lines[i] = lines[i].replace(tokenText, '').trim();
+                    removedLineIndex = i;
+                    break;
+                }
+            }
+            if (removedLineIndex < 0) return false;
+
+            const normalized = [];
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i] === '' && normalized.length > 0 && normalized[normalized.length - 1] === '') continue;
+                normalized.push(lines[i]);
+            }
+
+            const pageLengths = currentPages.map(p => p.length);
+            let targetPageStart = 0;
+            for (let p = 0; p < targetPageIndex && p < pageLengths.length; p++) {
+                targetPageStart += pageLengths[p];
+            }
+            const offset = targetOffsetInPage === null ? pageLengths[targetPageIndex] || 0 : targetOffsetInPage;
+            let insertAt = targetPageStart + offset;
+            const adjustedInsertAt = removedLineIndex < insertAt ? Math.max(0, insertAt - 1) : insertAt;
+
+            normalized.splice(Math.min(adjustedInsertAt, normalized.length), 0, tokenText);
+            textarea.value = normalized.join('\n');
+            clearImageLayoutStateBySrc(resolveImageSrcByToken(tokenId));
+            return true;
         }
 
         function moveImageMarkdownToPage(imageSrc, sourcePageIndex, targetPageIndex, targetOffsetInPage = null) {
@@ -1436,12 +1535,19 @@
 
                         const targetPageIndex = getPageIndexFromPoint(ev.clientX, ev.clientY);
                         const imageSrc = img.getAttribute('src') || '';
+                        const imageTokenId = img.dataset.imgToken || '';
 
                         cleanup();
 
-                        if (targetPageIndex !== null && targetPageIndex !== pageIndex && imageSrc) {
+                        if (targetPageIndex !== null && targetPageIndex !== pageIndex) {
                             const dropOffset = getDropOffsetInTargetPage(targetPageIndex, ev.clientY);
-                            const moved = moveImageMarkdownToPage(imageSrc, pageIndex, targetPageIndex, dropOffset);
+                            let moved = false;
+                            if (imageTokenId) {
+                                moved = moveImageTokenToPage(imageTokenId, pageIndex, targetPageIndex, dropOffset);
+                            }
+                            if (!moved && imageSrc) {
+                                moved = moveImageMarkdownToPage(imageSrc, pageIndex, targetPageIndex, dropOffset);
+                            }
                             if (moved) {
                                 generatePages();
                                 return;
@@ -1584,6 +1690,10 @@
             if (imageInput) imageInput.click();
         }
 
+        function generateImageTokenId() {
+            return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+        }
+
         function handleInlineImageUpload(event) {
             const file = event.target.files && event.target.files[0];
             if (!file) return;
@@ -1599,13 +1709,17 @@
             const reader = new FileReader();
             reader.onload = function (e) {
                 const imageUrl = e.target.result;
+                const tokenId = generateImageTokenId();
+                imageAssetMap[tokenId] = imageUrl;
+                saveImageAssetsToStorage();
+
                 const textarea = document.getElementById('inputText');
                 const start = textarea.selectionStart;
                 const end = textarea.selectionEnd;
-                const markdownImage = `\n![图片](${imageUrl})\n`;
+                const imageToken = `\n${getImageTokenText(tokenId)}\n`;
 
-                textarea.value = textarea.value.substring(0, start) + markdownImage + textarea.value.substring(end);
-                const cursor = start + markdownImage.length;
+                textarea.value = textarea.value.substring(0, start) + imageToken + textarea.value.substring(end);
+                const cursor = start + imageToken.length;
                 textarea.selectionStart = cursor;
                 textarea.selectionEnd = cursor;
                 textarea.focus();
@@ -1644,6 +1758,7 @@
             const inputText = document.getElementById('inputText');
             loadImagePositionsFromStorage();
             loadImageStylesFromStorage();
+            loadImageAssetsFromStorage();
 
             if (inputText) {
                 inputText.value = `# 小红书长文排版工具使用指南
