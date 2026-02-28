@@ -333,6 +333,7 @@
                             aria-label="当前图片宽度">
                         %
                         <button type="button" onclick="applySelectedImageStyle()" class="toolbar-btn" style="margin-left:8px;">应用</button>
+                        <button type="button" onclick="resetSelectedImagePosition()" class="toolbar-btn" style="margin-left:8px;">归位</button>
                     </div>
                     <div class="setting-item">
                         <label>当前图片对齐：</label>
@@ -482,6 +483,7 @@
                         <li>图片位置会自动持久化，重新生成后仍保留（同一浏览器）</li>
                         <li>点击图片可单独设置宽度和对齐（左/中/右）</li>
                         <li>图片拖到其他分页后会自动清理旧偏移并按目标版面自适应</li>
+                        <li>选中图片后可点击“归位”恢复到初始插入位置</li>
                         <li>可使用工具栏快速添加格式，或手动编写Markdown</li>
                         <li>标题功能：点击H1/H2/H3按钮快速添加标题，或手动输入#、##、###</li>
                         <li>点击"切换预览"查看格式效果</li>
@@ -1288,6 +1290,16 @@
             const align = document.getElementById('selectedImageAlign')?.value || 'center';
             imageStyleMap[selectedImageKey] = { widthPct, align };
             saveImageStylesToStorage();
+            generatePages();
+        }
+
+        function resetSelectedImagePosition() {
+            if (!selectedImageKey) {
+                alert('请先在预览区点击一张图片再归位');
+                return;
+            }
+            imagePositionMap[selectedImageKey] = { x: 0, y: 0 };
+            saveImagePositionsToStorage();
             generatePages();
         }
 
