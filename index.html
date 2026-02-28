@@ -1333,13 +1333,16 @@
         function enableImageDrag(container, pageIndex) {
             const images = container.querySelectorAll('.md-inline-image');
             images.forEach((img, imgIndex) => {
+                img.style.touchAction = 'none';
+
                 img.addEventListener('click', function (e) {
                     e.stopPropagation();
                     selectImageForEditing(img);
                 });
 
-                img.addEventListener('mousedown', function (e) {
+                img.addEventListener('pointerdown', function (e) {
                     e.preventDefault();
+                    const pointerId = e.pointerId;
                     const startX = e.clientX;
                     const startY = e.clientY;
                     const prevX = parseFloat(img.dataset.tx || '0');
@@ -1347,8 +1350,10 @@
                     const key = getImagePositionKey(pageIndex, imgIndex, img);
 
                     img.style.cursor = 'grabbing';
+                    if (img.setPointerCapture) img.setPointerCapture(pointerId);
 
                     function onMove(ev) {
+                        if (ev.pointerId !== pointerId) return;
                         const dx = ev.clientX - startX;
                         const dy = ev.clientY - startY;
                         const tx = prevX + dx;
@@ -1358,7 +1363,8 @@
                         img.style.transform = `translate(${tx}px, ${ty}px)`;
                     }
 
-                    function onUp(ev) {
+                    function finish(ev) {
+                        if (ev.pointerId !== pointerId) return;
                         const finalX = parseFloat(img.dataset.tx || '0');
                         const finalY = parseFloat(img.dataset.ty || '0');
                         imagePositionMap[key] = { x: finalX, y: finalY };
@@ -1366,24 +1372,31 @@
 
                         const targetPageIndex = getPageIndexFromPoint(ev.clientX, ev.clientY);
                         const imageSrc = img.getAttribute('src') || '';
+
+                        cleanup();
+
                         if (targetPageIndex !== null && targetPageIndex !== pageIndex && imageSrc) {
                             const moved = moveImageMarkdownToPage(imageSrc, pageIndex, targetPageIndex);
                             if (moved) {
-                                img.style.cursor = 'grab';
-                                document.removeEventListener('mousemove', onMove);
-                                document.removeEventListener('mouseup', onUp);
                                 generatePages();
                                 return;
                             }
                         }
-
-                        img.style.cursor = 'grab';
-                        document.removeEventListener('mousemove', onMove);
-                        document.removeEventListener('mouseup', onUp);
                     }
 
-                    document.addEventListener('mousemove', onMove);
-                    document.addEventListener('mouseup', onUp);
+                    function cleanup() {
+                        img.style.cursor = 'grab';
+                        if (img.releasePointerCapture && img.hasPointerCapture && img.hasPointerCapture(pointerId)) {
+                            img.releasePointerCapture(pointerId);
+                        }
+                        document.removeEventListener('pointermove', onMove);
+                        document.removeEventListener('pointerup', finish);
+                        document.removeEventListener('pointercancel', finish);
+                    }
+
+                    document.addEventListener('pointermove', onMove, { passive: false });
+                    document.addEventListener('pointerup', finish);
+                    document.addEventListener('pointercancel', finish);
                 });
             });
         }
