@@ -511,13 +511,42 @@
         let imageStyleMap = {};
         let selectedImageKey = null;
 
+        // ---- Refactor Stage 1: shared settings/helpers ----
+        function readLayoutOptions() {
+            return {
+                fontSize: parseInt(document.getElementById('fontSize')?.value || '13'),
+                lineHeight: parseFloat(document.getElementById('lineHeight')?.value || '1.8'),
+                watermarkText: document.getElementById('watermarkText')?.value || '',
+                bgColor: document.getElementById('bgColor')?.value || 'white',
+                bgTexture: document.getElementById('bgTexture')?.value || 'none',
+                fontFamily: document.getElementById('fontFamily')?.value || 'default',
+                enableHeader: !!document.getElementById('enableHeader')?.checked,
+                headerText: document.getElementById('headerText')?.value || '',
+                headerStyle: document.getElementById('headerStyle')?.value || 'left',
+                aspectRatio: document.getElementById('aspectRatio')?.value || '2:3',
+                imageMaxHeight: parseInt(document.getElementById('imageMaxHeight')?.value || '180')
+            };
+        }
+
+        function applyFontFamilyStyle(element, fontFamily) {
+            if (fontFamily === 'default') {
+                element.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
+            } else if (fontFamily && fontFamily !== 'custom') {
+                element.style.fontFamily = `"${fontFamily}", -apple-system, BlinkMacSystemFont, sans-serif`;
+            }
+        }
+
+        function renderMarkdownImageTag(alt, src) {
+            const safeAlt = (alt || '').replace(/["<>]/g, '');
+            const safeSrc = (src || '').trim();
+            const { imageMaxHeight } = readLayoutOptions();
+            return `<div class="md-image-wrap" style="margin: 0.5em 0; text-align:center; position:relative;"><img class="md-inline-image" src="${safeSrc}" alt="${safeAlt}" style="max-width:100%; max-height:${imageMaxHeight}px; width:auto; height:auto; object-fit:contain; border-radius:8px; display:inline-block; position:relative; cursor:grab; user-select:none;" loading="eager" draggable="false" /></div>`;
+        }
+
         // 恢复最初的分页函数：段落整体分页，不分行填满
         function splitTextIntoPages(text) {
             try {
-                const fontSize = parseInt(document.getElementById('fontSize').value) || 13;
-                const lineHeight = parseFloat(document.getElementById('lineHeight').value) || 1.8;
-                const enableHeader = document.getElementById('enableHeader').checked || false;
-                const aspectRatio = document.getElementById('aspectRatio').value || '2:3';
+                const { fontSize, lineHeight, enableHeader, aspectRatio, imageMaxHeight } = readLayoutOptions();
                 const dimensions = getAspectRatioDimensions(aspectRatio);
 
                 const pageHeight = dimensions.preview.height;
@@ -536,7 +565,6 @@
                 const lineHeightPx = fontSize * lineHeight;
                 const maxLinesPerPage = Math.max(1, Math.floor(availableHeight / lineHeightPx) - 1);
                 const charsPerLine = Math.floor(availableWidth / (fontSize * 0.9));
-                const imageMaxHeight = parseInt(document.getElementById('imageMaxHeight')?.value || '180');
 
                 const paragraphs = text.split('\n');
                 // 处理每个段落，计算实际占用的行数（包含图片块）
@@ -624,10 +652,7 @@
                 .replace(/^# (.*$)/gim, '<h1 style="margin: 0; margin-bottom: 0.3em; font-size: 1.2em; font-weight: bold; color: #333;">$1</h1>')
                 // 处理图片（Markdown）
                 .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, function (_, alt, src) {
-                    const safeAlt = (alt || '').replace(/["<>]/g, '');
-                    const safeSrc = (src || '').trim();
-                    const imageMaxHeight = parseInt(document.getElementById('imageMaxHeight')?.value || '180');
-                    return `<div class="md-image-wrap" style="margin: 0.5em 0; text-align:center; position:relative;"><img class="md-inline-image" src="${safeSrc}" alt="${safeAlt}" style="max-width:100%; max-height:${imageMaxHeight}px; width:auto; height:auto; object-fit:contain; border-radius:8px; display:inline-block; position:relative; cursor:grab; user-select:none;" loading="eager" draggable="false" /></div>`;
+                    return renderMarkdownImageTag(alt, src);
                 })
                 // 处理其他格式
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
@@ -993,22 +1018,24 @@
                     return;
                 }
 
-                const fontSize = document.getElementById('fontSize').value;
-                const lineHeight = document.getElementById('lineHeight').value;
-                const watermarkText = document.getElementById('watermarkText').value;
-                const bgColor = document.getElementById('bgColor').value;
-                const bgTexture = document.getElementById('bgTexture').value;
-                const fontFamily = document.getElementById('fontFamily').value;
-                const enableHeader = document.getElementById('enableHeader').checked;
-                const headerText = document.getElementById('headerText').value;
-                const headerStyle = document.getElementById('headerStyle').value;
+                const {
+                    fontSize,
+                    lineHeight,
+                    watermarkText,
+                    bgColor,
+                    bgTexture,
+                    fontFamily,
+                    enableHeader,
+                    headerText,
+                    headerStyle,
+                    aspectRatio
+                } = readLayoutOptions();
 
                 currentPages = splitTextIntoPages(inputText);
 
                 const previewContainer = document.getElementById('previewContainer');
                 previewContainer.innerHTML = '';
 
-                const aspectRatio = document.getElementById('aspectRatio').value;
                 const dimensions = getAspectRatioDimensions(aspectRatio);
                 updatePreviewContainerHeight(dimensions.preview.height);
 
@@ -1051,11 +1078,7 @@
                             background: rgba(255, 255, 255, 0.5);
                         `;
 
-                        if (fontFamily === 'default') {
-                            headerDiv.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
-                        } else if (fontFamily !== 'custom') {
-                            headerDiv.style.fontFamily = `"${fontFamily}", -apple-system, BlinkMacSystemFont, sans-serif`;
-                        }
+                        applyFontFamilyStyle(headerDiv, fontFamily);
 
                         headerDiv.textContent = headerText;
                         pageDiv.appendChild(headerDiv);
@@ -1072,11 +1095,7 @@
                         word-break: break-all;
                     `;
 
-                    if (fontFamily === 'default') {
-                        contentDiv.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
-                    } else if (fontFamily !== 'custom') {
-                        contentDiv.style.fontFamily = `"${fontFamily}", -apple-system, BlinkMacSystemFont, sans-serif`;
-                    }
+                    applyFontFamilyStyle(contentDiv, fontFamily);
 
                     contentDiv.innerHTML = formatTextWithParagraphs(pageTextArray);
                     applySavedImagePositions(contentDiv, index);
