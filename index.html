@@ -481,6 +481,7 @@
                         <li>图片可在预览区内拖拽微调位置（按住图片拖动）</li>
                         <li>图片位置会自动持久化，重新生成后仍保留（同一浏览器）</li>
                         <li>点击图片可单独设置宽度和对齐（左/中/右）</li>
+                        <li>图片拖到其他分页后会自动清理旧偏移并按目标版面自适应</li>
                         <li>可使用工具栏快速添加格式，或手动编写Markdown</li>
                         <li>标题功能：点击H1/H2/H3按钮快速添加标题，或手动输入#、##、###</li>
                         <li>点击"切换预览"查看格式效果</li>
@@ -536,17 +537,29 @@
             }
         }
 
+        function getAdaptiveImageMaxHeight(baseMaxHeight) {
+            const { aspectRatio, enableHeader, headerText } = readLayoutOptions();
+            const dimensions = getAspectRatioDimensions(aspectRatio);
+            const pageHeight = dimensions.preview.height;
+            const headerHeight = (enableHeader && headerText.trim()) ? 40 : 0;
+            const contentHeight = Math.max(120, pageHeight - 30 - 55 - headerHeight);
+            const adaptiveCap = Math.floor(contentHeight * 0.45);
+            return Math.max(80, Math.min(baseMaxHeight, adaptiveCap));
+        }
+
         function renderMarkdownImageTag(alt, src) {
             const safeAlt = (alt || '').replace(/["<>]/g, '');
             const safeSrc = (src || '').trim();
             const { imageMaxHeight } = readLayoutOptions();
-            return `<div class="md-image-wrap" style="margin: 0.5em 0; text-align:center; position:relative;"><img class="md-inline-image" src="${safeSrc}" alt="${safeAlt}" style="max-width:100%; max-height:${imageMaxHeight}px; width:auto; height:auto; object-fit:contain; border-radius:8px; display:inline-block; position:relative; cursor:grab; user-select:none;" loading="eager" draggable="false" /></div>`;
+            const adaptiveImageMaxHeight = getAdaptiveImageMaxHeight(imageMaxHeight);
+            return `<div class="md-image-wrap" style="margin: 0.5em 0; text-align:center; position:relative;"><img class="md-inline-image" src="${safeSrc}" alt="${safeAlt}" style="max-width:100%; max-height:${adaptiveImageMaxHeight}px; width:auto; height:auto; object-fit:contain; border-radius:8px; display:inline-block; position:relative; cursor:grab; user-select:none;" loading="eager" draggable="false" /></div>`;
         }
 
         // 恢复最初的分页函数：段落整体分页，不分行填满
         function splitTextIntoPages(text) {
             try {
                 const { fontSize, lineHeight, enableHeader, aspectRatio, imageMaxHeight } = readLayoutOptions();
+                const adaptiveImageMaxHeight = getAdaptiveImageMaxHeight(imageMaxHeight);
                 const dimensions = getAspectRatioDimensions(aspectRatio);
 
                 const pageHeight = dimensions.preview.height;
@@ -579,7 +592,7 @@
 
                     const imageMatches = paragraph.match(/!\[[^\]]*\]\(([^)]+)\)/g) || [];
                     const imageLines = imageMatches.length > 0
-                        ? imageMatches.length * Math.ceil((imageMaxHeight + 16) / lineHeightPx)
+                        ? imageMatches.length * Math.ceil((adaptiveImageMaxHeight + 16) / lineHeightPx)
                         : 0;
 
                     const plainText = paragraph
@@ -1280,13 +1293,37 @@
 
         function getPageIndexFromPoint(clientX, clientY) {
             const pages = document.querySelectorAll('.page-preview');
+            let nearest = null;
+            let nearestDist = Number.POSITIVE_INFINITY;
+
             for (let i = 0; i < pages.length; i++) {
                 const rect = pages[i].getBoundingClientRect();
                 if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
                     return parseInt(pages[i].getAttribute('data-page-index') || String(i));
                 }
+
+                const cx = (rect.left + rect.right) / 2;
+                const cy = (rect.top + rect.bottom) / 2;
+                const d = Math.hypot(clientX - cx, clientY - cy);
+                if (d < nearestDist) {
+                    nearestDist = d;
+                    nearest = parseInt(pages[i].getAttribute('data-page-index') || String(i));
+                }
             }
-            return null;
+
+            return nearest;
+        }
+
+        function clearImageLayoutStateBySrc(imageSrc) {
+            if (!imageSrc) return;
+            Object.keys(imagePositionMap).forEach(key => {
+                if (key.includes(hashString(imageSrc))) delete imagePositionMap[key];
+            });
+            Object.keys(imageStyleMap).forEach(key => {
+                if (key.includes(hashString(imageSrc))) delete imageStyleMap[key];
+            });
+            saveImagePositionsToStorage();
+            saveImageStylesToStorage();
         }
 
         function moveImageMarkdownToPage(imageSrc, sourcePageIndex, targetPageIndex) {
@@ -1327,6 +1364,7 @@
             normalized.splice(Math.min(adjustedInsertAt, normalized.length), 0, imageMarkdown);
 
             textarea.value = normalized.join('\n');
+            clearImageLayoutStateBySrc(imageSrc);
             return true;
         }
 
