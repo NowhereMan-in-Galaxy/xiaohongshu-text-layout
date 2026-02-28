@@ -1326,7 +1326,19 @@
             saveImageStylesToStorage();
         }
 
-        function moveImageMarkdownToPage(imageSrc, sourcePageIndex, targetPageIndex) {
+        function getDropOffsetInTargetPage(targetPageIndex, clientY) {
+            const pageEl = document.querySelector(`.page-preview[data-page-index="${targetPageIndex}"]`);
+            if (!pageEl) return null;
+            const contentEl = pageEl.querySelector('.page-content');
+            if (!contentEl) return null;
+            const rect = contentEl.getBoundingClientRect();
+            if (rect.height <= 0) return null;
+            const ratio = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+            const pageLen = (currentPages[targetPageIndex] || []).length;
+            return Math.max(0, Math.min(pageLen, Math.round(pageLen * ratio)));
+        }
+
+        function moveImageMarkdownToPage(imageSrc, sourcePageIndex, targetPageIndex, targetOffsetInPage = null) {
             if (targetPageIndex === null || targetPageIndex === undefined || sourcePageIndex === targetPageIndex) return false;
             const textarea = document.getElementById('inputText');
             const lines = textarea.value.split('\n');
@@ -1355,10 +1367,12 @@
             }
 
             const pageLengths = currentPages.map(p => p.length);
-            let insertAt = 0;
-            for (let p = 0; p <= targetPageIndex && p < pageLengths.length; p++) {
-                insertAt += pageLengths[p];
+            let targetPageStart = 0;
+            for (let p = 0; p < targetPageIndex && p < pageLengths.length; p++) {
+                targetPageStart += pageLengths[p];
             }
+            const offset = targetOffsetInPage === null ? pageLengths[targetPageIndex] || 0 : targetOffsetInPage;
+            let insertAt = targetPageStart + offset;
 
             const adjustedInsertAt = removedLineIndex !== -1 && removedLineIndex < insertAt ? Math.max(0, insertAt - 1) : insertAt;
             normalized.splice(Math.min(adjustedInsertAt, normalized.length), 0, imageMarkdown);
@@ -1414,7 +1428,8 @@
                         cleanup();
 
                         if (targetPageIndex !== null && targetPageIndex !== pageIndex && imageSrc) {
-                            const moved = moveImageMarkdownToPage(imageSrc, pageIndex, targetPageIndex);
+                            const dropOffset = getDropOffsetInTargetPage(targetPageIndex, ev.clientY);
+                            const moved = moveImageMarkdownToPage(imageSrc, pageIndex, targetPageIndex, dropOffset);
                             if (moved) {
                                 generatePages();
                                 return;
