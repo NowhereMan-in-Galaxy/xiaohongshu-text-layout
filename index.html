@@ -96,6 +96,9 @@
             flex-wrap: wrap;
             gap: 20px;
             justify-content: center;
+            min-height: 70vh;
+            padding: 8px;
+            align-content: flex-start;
         }
 
         .page-preview {
@@ -288,6 +291,8 @@
                     <button class="toolbar-btn" onclick="insertMarkdown('*', '*')" title="斜体"><em>I</em> 斜体</button>
                     <button class="toolbar-btn" onclick="insertMarkdown('__', '__')" title="下划线"><u>U</u> 下划线</button>
                     <button class="toolbar-btn" onclick="insertMarkdown('~~', '~~')" title="删除线"><s>S</s> 删除线</button>
+                    <button class="toolbar-btn" onclick="triggerImageUpload()" title="插入图片">🖼️ 插图</button>
+                    <input type="file" id="inlineImageUpload" accept="image/*" style="display:none;" onchange="handleInlineImageUpload(event)">
                     <div class="color-selector">
                         <div class="color-btn" style="background: #ff4757;" onclick="insertColor('#ff4757')" title="红色">
                         </div>
@@ -315,6 +320,29 @@
                         <input type="number" id="fontSize" value="13" min="12" max="20" title="设置字体大小"
                             aria-label="字体大小">
                         px
+                    </div>
+                    <div class="setting-item">
+                        <label>图片最大高度：</label>
+                        <input type="number" id="imageMaxHeight" value="180" min="80" max="420" title="正文图片最大高度"
+                            aria-label="图片最大高度">
+                        px
+                    </div>
+                    <div class="setting-item">
+                        <label>当前图片宽度：</label>
+                        <input type="number" id="selectedImageWidth" value="100" min="20" max="100" title="当前选中图片宽度"
+                            aria-label="当前图片宽度">
+                        %
+                        <button type="button" onclick="applySelectedImageStyle()" class="toolbar-btn" style="margin-left:8px;">应用</button>
+                        <button type="button" onclick="resetSelectedImagePosition()" class="toolbar-btn" style="margin-left:8px;">归位</button>
+                    </div>
+                    <div class="setting-item">
+                        <label>当前图片对齐：</label>
+                        <select id="selectedImageAlign" title="当前选中图片对齐" aria-label="当前选中图片对齐"
+                            style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 200px;">
+                            <option value="left">左对齐</option>
+                            <option value="center" selected>居中</option>
+                            <option value="right">右对齐</option>
+                        </select>
                     </div>
                     <div class="setting-item">
                         <label>行高：</label>
@@ -450,6 +478,12 @@
                         <li>回车控制：使用回车控制段落间距和空白，多个回车创建更多空白</li>
                         <li>内容保护：页面容量智能计算，避免内容超出范围</li>
                         <li>支持Markdown格式：# 一级标题 ## 二级标题 ### 三级标题 **加粗** *斜体* __下划线__ [color:#ff0000]红色[/color]</li>
+                        <li>支持图片：点击“🖼️ 插图”上传本地图片（编辑器显示 [[IMG:xxxx]] 占位符），或使用 ![说明](图片URL)</li>
+                        <li>图片可在预览区内拖拽微调位置（按住图片拖动）</li>
+                        <li>图片位置会自动持久化，重新生成后仍保留（同一浏览器）</li>
+                        <li>点击图片可单独设置宽度和对齐（左/中/右）</li>
+                        <li>图片拖到其他分页后会自动清理旧偏移并按目标版面自适应</li>
+                        <li>选中图片后可点击“归位”恢复到初始插入位置</li>
                         <li>可使用工具栏快速添加格式，或手动编写Markdown</li>
                         <li>标题功能：点击H1/H2/H3按钮快速添加标题，或手动输入#、##、###</li>
                         <li>点击"切换预览"查看格式效果</li>
@@ -476,14 +510,74 @@
         // 全局变量声明
         let currentPages = [];
         let currentPageIndex = 0;
+        let imagePositionMap = {};
+        let imageStyleMap = {};
+        let imageAssetMap = {};
+        let selectedImageKey = null;
+
+        const IMAGE_TOKEN_REGEX = /\[\[IMG:([a-zA-Z0-9_-]+)\]\]/g;
+
+        // ---- Refactor Stage 1: shared settings/helpers ----
+        function readLayoutOptions() {
+            return {
+                fontSize: parseInt(document.getElementById('fontSize')?.value || '13'),
+                lineHeight: parseFloat(document.getElementById('lineHeight')?.value || '1.8'),
+                watermarkText: document.getElementById('watermarkText')?.value || '',
+                bgColor: document.getElementById('bgColor')?.value || 'white',
+                bgTexture: document.getElementById('bgTexture')?.value || 'none',
+                fontFamily: document.getElementById('fontFamily')?.value || 'default',
+                enableHeader: !!document.getElementById('enableHeader')?.checked,
+                headerText: document.getElementById('headerText')?.value || '',
+                headerStyle: document.getElementById('headerStyle')?.value || 'left',
+                aspectRatio: document.getElementById('aspectRatio')?.value || '2:3',
+                imageMaxHeight: parseInt(document.getElementById('imageMaxHeight')?.value || '180')
+            };
+        }
+
+        function applyFontFamilyStyle(element, fontFamily) {
+            if (fontFamily === 'default') {
+                element.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
+            } else if (fontFamily && fontFamily !== 'custom') {
+                element.style.fontFamily = `"${fontFamily}", -apple-system, BlinkMacSystemFont, sans-serif`;
+            }
+        }
+
+        function getAdaptiveImageMaxHeight(baseMaxHeight) {
+            const { aspectRatio, enableHeader, headerText } = readLayoutOptions();
+            const dimensions = getAspectRatioDimensions(aspectRatio);
+            const pageHeight = dimensions.preview.height;
+            const headerHeight = (enableHeader && headerText.trim()) ? 40 : 0;
+            const contentHeight = Math.max(120, pageHeight - 30 - 55 - headerHeight);
+            const adaptiveCap = Math.floor(contentHeight * 0.45);
+            return Math.max(80, Math.min(baseMaxHeight, adaptiveCap));
+        }
+
+        function getImageTokenText(tokenId) {
+            return `[[IMG:${tokenId}]]`;
+        }
+
+        function getImageDisplayPlaceholder(tokenId) {
+            return `【🖼️图片:${tokenId}】`;
+        }
+
+        function resolveImageSrcByToken(tokenId) {
+            return imageAssetMap[tokenId] || '';
+        }
+
+        function renderMarkdownImageTag(alt, src, tokenId = '') {
+            const safeAlt = (alt || '').replace(/["<>]/g, '');
+            const safeSrc = (src || '').trim();
+            const safeToken = (tokenId || '').replace(/["<>]/g, '');
+            const { imageMaxHeight } = readLayoutOptions();
+            const adaptiveImageMaxHeight = getAdaptiveImageMaxHeight(imageMaxHeight);
+            return `<div class="md-image-wrap" style="margin: 0.5em 0; text-align:center; position:relative;"><img class="md-inline-image" data-img-token="${safeToken}" src="${safeSrc}" alt="${safeAlt}" style="max-width:100%; max-height:${adaptiveImageMaxHeight}px; width:auto; height:auto; object-fit:contain; border-radius:8px; display:inline-block; position:relative; cursor:grab; user-select:none;" loading="eager" draggable="false" /></div>`;
+        }
 
         // 恢复最初的分页函数：段落整体分页，不分行填满
         function splitTextIntoPages(text) {
             try {
-                const fontSize = parseInt(document.getElementById('fontSize').value) || 13;
-                const lineHeight = parseFloat(document.getElementById('lineHeight').value) || 1.8;
-                const enableHeader = document.getElementById('enableHeader').checked || false;
-                const aspectRatio = document.getElementById('aspectRatio').value || '2:3';
+                const { fontSize, lineHeight, enableHeader, aspectRatio, imageMaxHeight } = readLayoutOptions();
+                const adaptiveImageMaxHeight = getAdaptiveImageMaxHeight(imageMaxHeight);
                 const dimensions = getAspectRatioDimensions(aspectRatio);
 
                 const pageHeight = dimensions.preview.height;
@@ -504,28 +598,38 @@
                 const charsPerLine = Math.floor(availableWidth / (fontSize * 0.9));
 
                 const paragraphs = text.split('\n');
-                // 处理每个段落，计算实际占用的行数
+                // 处理每个段落，计算实际占用的行数（包含图片块）
                 const processedParagraphs = paragraphs.map(paragraph => {
                     if (paragraph.trim() === '') {
-                        // 空行占一行
                         return {
                             text: '',
                             lines: 1,
                             isEmptyLine: true
                         };
                     }
-                    // 移除Markdown标记来计算实际长度
+
+                    const imageMatches = paragraph.match(/!\[[^\]]*\]\(([^)]+)\)/g) || [];
+                    const imageTokenMatches = paragraph.match(IMAGE_TOKEN_REGEX) || [];
+                    const imageCount = imageMatches.length + imageTokenMatches.length;
+                    const imageLines = imageCount > 0
+                        ? imageCount * Math.ceil((adaptiveImageMaxHeight + 16) / lineHeightPx)
+                        : 0;
+
                     const plainText = paragraph
+                        .replace(IMAGE_TOKEN_REGEX, '')
+                        .replace(/!\[[^\]]*\]\(([^)]+)\)/g, '')
                         .replace(/\*\*(.*?)\*\*/g, '$1')
                         .replace(/\*(.*?)\*/g, '$1')
                         .replace(/__(.*?)__/g, '$1')
                         .replace(/~~(.*?)~~/g, '$1')
                         .replace(/\[color:#[a-fA-F0-9]{6}\](.*?)\[\/color\]/g, '$1');
-                    // 计算这个段落需要多少行
-                    const linesNeeded = Math.ceil(plainText.length / charsPerLine) || 1;
+
+                    const textLines = Math.ceil(Math.max(plainText.length, 1) / charsPerLine) || 1;
+                    const linesNeeded = textLines + imageLines;
+
                     return {
                         text: paragraph,
-                        lines: linesNeeded,
+                        lines: Math.max(linesNeeded, 1),
                         isEmptyLine: false
                     };
                 });
@@ -580,6 +684,18 @@
                 .replace(/^### (.*$)/gim, '<h3 style="margin: 0; margin-bottom: 0.3em; font-size: 0.9em; font-weight: bold; color: #333;">$1</h3>')
                 .replace(/^## (.*$)/gim, '<h2 style="margin: 0; margin-bottom: 0.3em; font-size: 1.1em; font-weight: bold; color: #333;">$1</h2>')
                 .replace(/^# (.*$)/gim, '<h1 style="margin: 0; margin-bottom: 0.3em; font-size: 1.2em; font-weight: bold; color: #333;">$1</h1>')
+                // 处理图片（Token 占位）
+                .replace(IMAGE_TOKEN_REGEX, function (_, tokenId) {
+                    const src = resolveImageSrcByToken(tokenId);
+                    if (!src) {
+                        return `<span style="background:#fff0b3;color:#7a5f00;padding:2px 6px;border-radius:6px;">${getImageDisplayPlaceholder(tokenId)}</span>`;
+                    }
+                    return renderMarkdownImageTag('图片', src, tokenId);
+                })
+                // 处理图片（Markdown）
+                .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, function (_, alt, src) {
+                    return renderMarkdownImageTag(alt, src);
+                })
                 // 处理其他格式
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                 .replace(/\*(.*?)\*/g, '<em>$1</em>')
@@ -764,6 +880,13 @@
             }
         }
 
+        function updatePreviewContainerHeight(previewHeight) {
+            const previewContainer = document.getElementById('previewContainer');
+            if (!previewContainer || !previewHeight) return;
+            const minHeight = Math.round(previewHeight * 1.5);
+            previewContainer.style.minHeight = `${minHeight}px`;
+        }
+
         function updatePreviewSize() {
             const aspectRatio = document.getElementById('aspectRatio').value;
             const customOptions = document.getElementById('customSizeOptions');
@@ -772,6 +895,7 @@
 
             const pagePreviewElements = document.querySelectorAll('.page-preview');
             const dimensions = getAspectRatioDimensions(aspectRatio);
+            updatePreviewContainerHeight(dimensions.preview.height);
 
             pagePreviewElements.forEach(element => {
                 element.style.width = dimensions.preview.width + 'px';
@@ -936,23 +1060,26 @@
                     return;
                 }
 
-                const fontSize = document.getElementById('fontSize').value;
-                const lineHeight = document.getElementById('lineHeight').value;
-                const watermarkText = document.getElementById('watermarkText').value;
-                const bgColor = document.getElementById('bgColor').value;
-                const bgTexture = document.getElementById('bgTexture').value;
-                const fontFamily = document.getElementById('fontFamily').value;
-                const enableHeader = document.getElementById('enableHeader').checked;
-                const headerText = document.getElementById('headerText').value;
-                const headerStyle = document.getElementById('headerStyle').value;
+                const {
+                    fontSize,
+                    lineHeight,
+                    watermarkText,
+                    bgColor,
+                    bgTexture,
+                    fontFamily,
+                    enableHeader,
+                    headerText,
+                    headerStyle,
+                    aspectRatio
+                } = readLayoutOptions();
 
                 currentPages = splitTextIntoPages(inputText);
 
                 const previewContainer = document.getElementById('previewContainer');
                 previewContainer.innerHTML = '';
 
-                const aspectRatio = document.getElementById('aspectRatio').value;
                 const dimensions = getAspectRatioDimensions(aspectRatio);
+                updatePreviewContainerHeight(dimensions.preview.height);
 
                 currentPages.forEach((pageTextArray, index) => {
                     const pageDiv = document.createElement('div');
@@ -993,11 +1120,7 @@
                             background: rgba(255, 255, 255, 0.5);
                         `;
 
-                        if (fontFamily === 'default') {
-                            headerDiv.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
-                        } else if (fontFamily !== 'custom') {
-                            headerDiv.style.fontFamily = `"${fontFamily}", -apple-system, BlinkMacSystemFont, sans-serif`;
-                        }
+                        applyFontFamilyStyle(headerDiv, fontFamily);
 
                         headerDiv.textContent = headerText;
                         pageDiv.appendChild(headerDiv);
@@ -1014,13 +1137,11 @@
                         word-break: break-all;
                     `;
 
-                    if (fontFamily === 'default') {
-                        contentDiv.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
-                    } else if (fontFamily !== 'custom') {
-                        contentDiv.style.fontFamily = `"${fontFamily}", -apple-system, BlinkMacSystemFont, sans-serif`;
-                    }
+                    applyFontFamilyStyle(contentDiv, fontFamily);
 
                     contentDiv.innerHTML = formatTextWithParagraphs(pageTextArray);
+                    applySavedImagePositions(contentDiv, index);
+                    enableImageDrag(contentDiv, index);
                     contentWrapper.appendChild(contentDiv);
                     pageDiv.appendChild(contentWrapper);
 
@@ -1091,6 +1212,364 @@
 
         function downloadCurrentPage() {
             downloadPageByHtml2Canvas(currentPageIndex);
+        }
+
+        function hashString(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                hash |= 0;
+            }
+            return Math.abs(hash).toString(36);
+        }
+
+        function getImagePositionKey(pageIndex, imgIndex, img) {
+            const src = img.getAttribute('src') || '';
+            const srcHash = hashString(src);
+            return `${pageIndex}::${imgIndex}::${srcHash}`;
+        }
+
+        function saveImagePositionsToStorage() {
+            try {
+                localStorage.setItem('xhs_image_positions_v2', JSON.stringify(imagePositionMap));
+            } catch (e) {
+                console.warn('保存图片位置失败:', e);
+            }
+        }
+
+        function loadImagePositionsFromStorage() {
+            // 临时策略：禁用历史拖拽位置恢复，避免旧偏移导致图片不可见
+            imagePositionMap = {};
+            try { localStorage.removeItem('xhs_image_positions_v2'); } catch (e) { }
+        }
+
+        function saveImageStylesToStorage() {
+            try {
+                localStorage.setItem('xhs_image_styles_v2', JSON.stringify(imageStyleMap));
+            } catch (e) {
+                console.warn('保存图片样式失败:', e);
+            }
+        }
+
+        function loadImageStylesFromStorage() {
+            try {
+                const raw = localStorage.getItem('xhs_image_styles_v2');
+                if (raw) imageStyleMap = JSON.parse(raw) || {};
+            } catch (e) {
+                console.warn('读取图片样式失败:', e);
+                imageStyleMap = {};
+            }
+        }
+
+        function saveImageAssetsToStorage() {
+            try {
+                localStorage.setItem('xhs_image_assets_v1', JSON.stringify(imageAssetMap));
+            } catch (e) {
+                console.warn('保存图片资源失败:', e);
+            }
+        }
+
+        function loadImageAssetsFromStorage() {
+            try {
+                const raw = localStorage.getItem('xhs_image_assets_v1');
+                if (raw) imageAssetMap = JSON.parse(raw) || {};
+            } catch (e) {
+                console.warn('读取图片资源失败:', e);
+                imageAssetMap = {};
+            }
+        }
+
+        function applySavedImagePositions(container, pageIndex) {
+            const images = container.querySelectorAll('.md-inline-image');
+            images.forEach((img, idx) => {
+                const key = getImagePositionKey(pageIndex, idx, img);
+                img.dataset.styleKey = key;
+
+                const pos = imagePositionMap[key];
+                if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.y)) {
+                    const pageEl = img.closest('.page-preview');
+                    const maxX = (pageEl?.clientWidth || 300) * 0.9;
+                    const maxY = (pageEl?.clientHeight || 500) * 0.9;
+                    const safeX = Math.max(-maxX, Math.min(maxX, pos.x));
+                    const safeY = Math.max(-maxY, Math.min(maxY, pos.y));
+
+                    img.dataset.tx = String(safeX);
+                    img.dataset.ty = String(safeY);
+                    img.style.transform = `translate(${safeX}px, ${safeY}px)`;
+
+                    if (safeX !== pos.x || safeY !== pos.y) {
+                        imagePositionMap[key] = { x: safeX, y: safeY };
+                        saveImagePositionsToStorage();
+                    }
+                }
+
+                const styleCfg = imageStyleMap[key];
+                if (styleCfg) {
+                    if (styleCfg.widthPct) img.style.maxWidth = `${styleCfg.widthPct}%`;
+                    const wrap = img.closest('.md-image-wrap');
+                    if (wrap && styleCfg.align) wrap.style.textAlign = styleCfg.align;
+                }
+            });
+        }
+
+        function highlightImageTokenInEditor(tokenId) {
+            if (!tokenId) return;
+            const textarea = document.getElementById('inputText');
+            if (!textarea) return;
+            const tokenText = getImageTokenText(tokenId);
+            const idx = textarea.value.indexOf(tokenText);
+            if (idx >= 0) {
+                textarea.focus();
+                textarea.setSelectionRange(idx, idx + tokenText.length);
+            }
+        }
+
+        function selectImageForEditing(img) {
+            document.querySelectorAll('.md-inline-image').forEach(el => {
+                el.style.outline = '';
+            });
+            img.style.outline = '2px solid #ff2442';
+            selectedImageKey = img.dataset.styleKey || null;
+
+            const styleCfg = selectedImageKey ? imageStyleMap[selectedImageKey] : null;
+            const widthInput = document.getElementById('selectedImageWidth');
+            const alignInput = document.getElementById('selectedImageAlign');
+            if (widthInput) widthInput.value = styleCfg?.widthPct || 100;
+            if (alignInput) alignInput.value = styleCfg?.align || 'center';
+
+            const tokenId = img.dataset.imgToken || '';
+            highlightImageTokenInEditor(tokenId);
+        }
+
+        function applySelectedImageStyle() {
+            if (!selectedImageKey) {
+                alert('请先在预览区点击一张图片再应用样式');
+                return;
+            }
+            const widthPct = Math.max(20, Math.min(100, parseInt(document.getElementById('selectedImageWidth')?.value || '100')));
+            const align = document.getElementById('selectedImageAlign')?.value || 'center';
+            imageStyleMap[selectedImageKey] = { widthPct, align };
+            saveImageStylesToStorage();
+            generatePages();
+        }
+
+        function resetSelectedImagePosition() {
+            if (!selectedImageKey) {
+                alert('请先在预览区点击一张图片再归位');
+                return;
+            }
+            imagePositionMap[selectedImageKey] = { x: 0, y: 0 };
+            saveImagePositionsToStorage();
+            generatePages();
+        }
+
+        function getPageIndexFromPoint(clientX, clientY) {
+            const pages = document.querySelectorAll('.page-preview');
+            let nearest = null;
+            let nearestDist = Number.POSITIVE_INFINITY;
+
+            for (let i = 0; i < pages.length; i++) {
+                const rect = pages[i].getBoundingClientRect();
+                if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
+                    return parseInt(pages[i].getAttribute('data-page-index') || String(i));
+                }
+
+                const cx = (rect.left + rect.right) / 2;
+                const cy = (rect.top + rect.bottom) / 2;
+                const d = Math.hypot(clientX - cx, clientY - cy);
+                if (d < nearestDist) {
+                    nearestDist = d;
+                    nearest = parseInt(pages[i].getAttribute('data-page-index') || String(i));
+                }
+            }
+
+            return nearest;
+        }
+
+        function clearImageLayoutStateBySrc(imageSrc) {
+            if (!imageSrc) return;
+            Object.keys(imagePositionMap).forEach(key => {
+                if (key.includes(hashString(imageSrc))) delete imagePositionMap[key];
+            });
+            Object.keys(imageStyleMap).forEach(key => {
+                if (key.includes(hashString(imageSrc))) delete imageStyleMap[key];
+            });
+            saveImagePositionsToStorage();
+            saveImageStylesToStorage();
+        }
+
+        function getDropOffsetInTargetPage(targetPageIndex, clientY) {
+            const pageEl = document.querySelector(`.page-preview[data-page-index="${targetPageIndex}"]`);
+            if (!pageEl) return null;
+            const contentEl = pageEl.querySelector('.page-content');
+            if (!contentEl) return null;
+            const rect = contentEl.getBoundingClientRect();
+            if (rect.height <= 0) return null;
+            const ratio = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+            const pageLen = (currentPages[targetPageIndex] || []).length;
+            return Math.max(0, Math.min(pageLen, Math.round(pageLen * ratio)));
+        }
+
+        function moveImageTokenToPage(tokenId, sourcePageIndex, targetPageIndex, targetOffsetInPage = null) {
+            if (!tokenId) return false;
+            if (targetPageIndex === null || targetPageIndex === undefined || sourcePageIndex === targetPageIndex) return false;
+            const textarea = document.getElementById('inputText');
+            const lines = textarea.value.split('\n');
+            const tokenText = getImageTokenText(tokenId);
+
+            let removedLineIndex = -1;
+            for (let i = 0; i < lines.length; i++) {
+                const idx = lines[i].indexOf(tokenText);
+                if (idx >= 0) {
+                    lines[i] = lines[i].replace(tokenText, '').trim();
+                    removedLineIndex = i;
+                    break;
+                }
+            }
+            if (removedLineIndex < 0) return false;
+
+            const normalized = [];
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i] === '' && normalized.length > 0 && normalized[normalized.length - 1] === '') continue;
+                normalized.push(lines[i]);
+            }
+
+            const pageLengths = currentPages.map(p => p.length);
+            let targetPageStart = 0;
+            for (let p = 0; p < targetPageIndex && p < pageLengths.length; p++) {
+                targetPageStart += pageLengths[p];
+            }
+            const offset = targetOffsetInPage === null ? pageLengths[targetPageIndex] || 0 : targetOffsetInPage;
+            let insertAt = targetPageStart + offset;
+            const adjustedInsertAt = removedLineIndex < insertAt ? Math.max(0, insertAt - 1) : insertAt;
+
+            normalized.splice(Math.min(adjustedInsertAt, normalized.length), 0, tokenText);
+            textarea.value = normalized.join('\n');
+            clearImageLayoutStateBySrc(resolveImageSrcByToken(tokenId));
+            return true;
+        }
+
+        function moveImageMarkdownToPage(imageSrc, sourcePageIndex, targetPageIndex, targetOffsetInPage = null) {
+            if (targetPageIndex === null || targetPageIndex === undefined || sourcePageIndex === targetPageIndex) return false;
+            const textarea = document.getElementById('inputText');
+            const lines = textarea.value.split('\n');
+
+            let imageMarkdown = null;
+            let removedLineIndex = -1;
+            for (let i = 0; i < lines.length; i++) {
+                const matches = lines[i].match(/!\[[^\]]*\]\(([^)]+)\)/g) || [];
+                for (const md of matches) {
+                    const srcMatch = md.match(/!\[[^\]]*\]\(([^)]+)\)/);
+                    if (srcMatch && srcMatch[1] === imageSrc) {
+                        imageMarkdown = md;
+                        lines[i] = lines[i].replace(md, '').trim();
+                        removedLineIndex = i;
+                        break;
+                    }
+                }
+                if (imageMarkdown) break;
+            }
+            if (!imageMarkdown) return false;
+
+            const normalized = [];
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i] === '' && normalized.length > 0 && normalized[normalized.length - 1] === '') continue;
+                normalized.push(lines[i]);
+            }
+
+            const pageLengths = currentPages.map(p => p.length);
+            let targetPageStart = 0;
+            for (let p = 0; p < targetPageIndex && p < pageLengths.length; p++) {
+                targetPageStart += pageLengths[p];
+            }
+            const offset = targetOffsetInPage === null ? pageLengths[targetPageIndex] || 0 : targetOffsetInPage;
+            let insertAt = targetPageStart + offset;
+
+            const adjustedInsertAt = removedLineIndex !== -1 && removedLineIndex < insertAt ? Math.max(0, insertAt - 1) : insertAt;
+            normalized.splice(Math.min(adjustedInsertAt, normalized.length), 0, imageMarkdown);
+
+            textarea.value = normalized.join('\n');
+            clearImageLayoutStateBySrc(imageSrc);
+            return true;
+        }
+
+        function enableImageDrag(container, pageIndex) {
+            const images = container.querySelectorAll('.md-inline-image');
+            images.forEach((img, imgIndex) => {
+                img.style.touchAction = 'none';
+
+                img.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    selectImageForEditing(img);
+                });
+
+                img.addEventListener('pointerdown', function (e) {
+                    e.preventDefault();
+                    const pointerId = e.pointerId;
+                    const startX = e.clientX;
+                    const startY = e.clientY;
+                    const prevX = parseFloat(img.dataset.tx || '0');
+                    const prevY = parseFloat(img.dataset.ty || '0');
+                    const key = getImagePositionKey(pageIndex, imgIndex, img);
+
+                    img.style.cursor = 'grabbing';
+                    if (img.setPointerCapture) img.setPointerCapture(pointerId);
+
+                    function onMove(ev) {
+                        if (ev.pointerId !== pointerId) return;
+                        const dx = ev.clientX - startX;
+                        const dy = ev.clientY - startY;
+                        const tx = prevX + dx;
+                        const ty = prevY + dy;
+                        img.dataset.tx = String(tx);
+                        img.dataset.ty = String(ty);
+                        img.style.transform = `translate(${tx}px, ${ty}px)`;
+                    }
+
+                    function finish(ev) {
+                        if (ev.pointerId !== pointerId) return;
+                        const finalX = parseFloat(img.dataset.tx || '0');
+                        const finalY = parseFloat(img.dataset.ty || '0');
+                        imagePositionMap[key] = { x: finalX, y: finalY };
+                        saveImagePositionsToStorage();
+
+                        const targetPageIndex = getPageIndexFromPoint(ev.clientX, ev.clientY);
+                        const imageSrc = img.getAttribute('src') || '';
+                        const imageTokenId = img.dataset.imgToken || '';
+
+                        cleanup();
+
+                        if (targetPageIndex !== null && targetPageIndex !== pageIndex) {
+                            const dropOffset = getDropOffsetInTargetPage(targetPageIndex, ev.clientY);
+                            let moved = false;
+                            if (imageTokenId) {
+                                moved = moveImageTokenToPage(imageTokenId, pageIndex, targetPageIndex, dropOffset);
+                            }
+                            if (!moved && imageSrc) {
+                                moved = moveImageMarkdownToPage(imageSrc, pageIndex, targetPageIndex, dropOffset);
+                            }
+                            if (moved) {
+                                generatePages();
+                                return;
+                            }
+                        }
+                    }
+
+                    function cleanup() {
+                        img.style.cursor = 'grab';
+                        if (img.releasePointerCapture && img.hasPointerCapture && img.hasPointerCapture(pointerId)) {
+                            img.releasePointerCapture(pointerId);
+                        }
+                        document.removeEventListener('pointermove', onMove);
+                        document.removeEventListener('pointerup', finish);
+                        document.removeEventListener('pointercancel', finish);
+                    }
+
+                    document.addEventListener('pointermove', onMove, { passive: false });
+                    document.addEventListener('pointerup', finish);
+                    document.addEventListener('pointercancel', finish);
+                });
+            });
         }
 
         function downloadAllPages() {
@@ -1206,6 +1685,53 @@
             updatePreview();
         }
 
+        function triggerImageUpload() {
+            const imageInput = document.getElementById('inlineImageUpload');
+            if (imageInput) imageInput.click();
+        }
+
+        function generateImageTokenId() {
+            return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+        }
+
+        function handleInlineImageUpload(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+            if (!file.type.startsWith('image/')) {
+                alert('请选择图片文件');
+                return;
+            }
+            if (file.size > 8 * 1024 * 1024) {
+                alert('图片过大，请选择 8MB 以内图片');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const imageUrl = e.target.result;
+                const tokenId = generateImageTokenId();
+                imageAssetMap[tokenId] = imageUrl;
+                saveImageAssetsToStorage();
+
+                const textarea = document.getElementById('inputText');
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const imageToken = `\n${getImageTokenText(tokenId)}\n`;
+
+                textarea.value = textarea.value.substring(0, start) + imageToken + textarea.value.substring(end);
+                const cursor = start + imageToken.length;
+                textarea.selectionStart = cursor;
+                textarea.selectionEnd = cursor;
+                textarea.focus();
+                updatePreview();
+                regenerateIfNeeded();
+            };
+            reader.readAsDataURL(file);
+
+            // reset input to allow same file re-upload
+            event.target.value = '';
+        }
+
         function togglePreview() {
             const preview = document.getElementById('markdownPreview');
             if (preview.style.display === 'none') {
@@ -1230,6 +1756,10 @@
         document.addEventListener('DOMContentLoaded', function () {
             // 设置示例文本
             const inputText = document.getElementById('inputText');
+            loadImagePositionsFromStorage();
+            loadImageStylesFromStorage();
+            loadImageAssetsFromStorage();
+
             if (inputText) {
                 inputText.value = `# 小红书长文排版工具使用指南
 
@@ -1280,6 +1810,11 @@
             const lineHeightInput = document.getElementById('lineHeight');
             if (lineHeightInput) {
                 lineHeightInput.addEventListener('change', regenerateIfNeeded);
+            }
+
+            const imageMaxHeightInput = document.getElementById('imageMaxHeight');
+            if (imageMaxHeightInput) {
+                imageMaxHeightInput.addEventListener('change', regenerateIfNeeded);
             }
 
             // 延迟自动生成预览，确保所有元素都已加载
