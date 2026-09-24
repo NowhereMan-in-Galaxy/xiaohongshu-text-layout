@@ -22,6 +22,7 @@
     <script src="lib/jszip.min.js" defer></script>
     <script src="js/markdown.js" defer></script>
     <script src="js/themes.js" defer></script>
+    <script src="js/canvases.js" defer></script>
     <script src="js/store.js" defer></script>
     <script src="js/render.js" defer></script>
     <script src="js/stickers.js" defer></script>
@@ -50,6 +51,11 @@
                     <svg class="i caret" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
                 </button>
                 <div class="menu" id="draftMenu" hidden></div>
+            </div>
+
+            <div class="seg mode-seg" id="modeSeg" aria-label="排版模式">
+                <button data-mode="long" class="on" title="写长文，自动分页排版">长文</button>
+                <button data-mode="free" title="不写长文，文字、图片、贴纸自由摆放">自由</button>
             </div>
 
             <div class="grow"></div>
@@ -82,7 +88,37 @@
         <main class="workspace">
             <!-- 编辑区 -->
             <section class="pane editor-pane" aria-label="编辑">
-                <div class="toolbar" id="toolbar">
+                <!-- 自由排版模式的素材栏（长文模式下隐藏） -->
+                <div class="free-panel free-only" id="freePanel">
+                    <label class="fp-title">标题
+                        <input type="text" id="freeTitle" placeholder="用于导出的文件名和手机预览（可不填）">
+                    </label>
+
+                    <h4>添加到当前页</h4>
+                    <div class="fp-add">
+                        <button data-add="text"><svg class="i" viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></svg>文字</button>
+                        <button data-add="photo"><svg class="i" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M4 18l5-5 4 4 3-3 4 4"/></svg>图片</button>
+                        <button data-add="emoji"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 14c1.8 2 5.2 2 7 0M9 9.5v.5M15 9.5v.5"/></svg>表情</button>
+                    </div>
+                    <div class="fp-lines">
+                        <button data-fline="dashed" title="虚线"><svg class="i" viewBox="0 0 24 24"><path d="M3 12h3M10.5 12h3M18 12h3"/></svg></button>
+                        <button data-fline="arrow" title="箭头"><svg class="i" viewBox="0 0 24 24"><path d="M3 12h18M15 6l6 6-6 6"/></svg></button>
+                        <button data-fline="dashArrow" title="虚线箭头"><svg class="i" viewBox="0 0 24 24"><path d="M3 12h2.5M9 12h2.5M15 12h6M15 6l6 6-6 6"/></svg></button>
+                        <button data-fline="curve" title="弯箭头"><svg class="i" viewBox="0 0 24 24"><path d="M3 17C7 7 15 7 20 13M20 7v6h-6"/></svg></button>
+                        <button data-fline="both" title="双向箭头"><svg class="i" viewBox="0 0 24 24"><path d="M3 12h18M8 7l-5 5 5 5M16 7l5 5-5 5"/></svg></button>
+                    </div>
+
+                    <h4>手帐素材</h4>
+                    <div class="fp-decos" id="decoList"></div>
+
+                    <h4>页面 <button class="btn small" id="addPage">＋ 加一页</button></h4>
+                    <div class="fp-pages" id="pageList"></div>
+
+                    <p class="fp-tip">💡 图片可以直接拖到右边的页面上，或者复制后按 Ctrl/⌘ + V 粘贴。选中图片后，工具条上可以加「描边」、裁剪、抠图。</p>
+                    <input type="file" id="photoInput" accept="image/*" multiple hidden>
+                </div>
+
+                <div class="toolbar long-only" id="toolbar">
                     <button data-cmd="h1" title="一级标题">H1</button>
                     <button data-cmd="h2" title="二级标题">H2</button>
                     <button data-cmd="h3" title="三级标题">H3</button>
@@ -125,7 +161,7 @@
                     <button data-cmd="help" title="语法速查" class="help-btn">?</button>
                 </div>
 
-                <textarea id="editor" spellcheck="false" autocomplete="off" aria-label="正文"
+                <textarea class="long-only" id="editor" spellcheck="false" autocomplete="off" aria-label="正文"
                     placeholder="在这里写你的长文……&#10;&#10;# 一级标题会成为封面标题&#10;每一行是一个段落，写多长都行，会自动分页。"></textarea>
 
                 <div class="statusbar">
@@ -194,7 +230,12 @@
                     </button>
                 </div>
 
-                <section class="group">
+                <section class="group free-only">
+                    <h3>画布</h3>
+                    <div class="themes" id="canvasList"></div>
+                </section>
+
+                <section class="group long-only">
                     <h3>主题</h3>
                     <div class="themes" id="themeList"></div>
                 </section>
@@ -215,7 +256,7 @@
                     </div>
                 </section>
 
-                <section class="group">
+                <section class="group long-only">
                     <h3>文字</h3>
                     <label class="row">字号 <output id="fontSizeOut"></output>
                         <input type="range" id="fontSize" min="30" max="60" step="1">
@@ -239,7 +280,7 @@
                     </label>
                 </section>
 
-                <section class="group">
+                <section class="group long-only">
                     <h3>字体</h3>
                     <label class="row inline">正文
                         <select id="bodyFont">
@@ -269,7 +310,7 @@
                     </div>
                 </section>
 
-                <section class="group">
+                <section class="group long-only">
                     <h3>
                         封面
                         <label class="switch"><input type="checkbox" id="coverOn"></label>
@@ -290,7 +331,7 @@
 
                 <section class="group">
                     <h3>页眉页脚</h3>
-                    <label class="row">页眉
+                    <label class="row long-only">页眉
                         <input type="text" id="header" placeholder="每页顶部的小字（可选）">
                     </label>
                     <label class="row">署名 / 水印

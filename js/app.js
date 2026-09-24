@@ -19,6 +19,8 @@
     const DEFAULTS = {
         theme: 'grid',
         accent: null,
+        canvas: 'sage', // 自由排版模式的画布
+        canvasAccent: null,
         ratio: '3:4',
         fontSize: 36,
         lineHeight: 1.75,
@@ -94,9 +96,20 @@
         caretPage: -1,
         zoom: 300,
         busy: false,
-        stickers: [], // 贴纸，见 js/stickers.js
+        mode: 'long', // 'long' 长文排版 ｜ 'free' 自由排版
+        longStk: [], // 长文模式的贴纸，见 js/stickers.js
+        freeStk: [], // 自由排版模式里的所有内容（文字、图片、贴纸、线条）
+        freePages: 1,
+        freeTitle: '',
         sel: null, // 预览里选中的对象：{ kind: 'stk', id } 或 { kind: 'img', line, i }
     };
+
+    // 两种模式各有一套贴纸，互不影响；代码里统一用 state.stickers 访问当前模式的那一套
+    Object.defineProperty(state, 'stickers', {
+        get: () => (state.mode === 'free' ? state.freeStk : state.longStk),
+        set: (v) => { if (state.mode === 'free') state.freeStk = v; else state.longStk = v; },
+    });
+    const isFree = () => state.mode === 'free';
 
     const ed = $('#editor');
 
@@ -203,6 +216,20 @@
     async function update() {
         const gen = ++generation;
         const s = state.settings;
+        if (isFree()) {
+            await Images.resolveAll(state.stickers.filter((st) => st.src).map((st) => st.src));
+            if (gen !== generation) return;
+            const title = state.freeTitle.trim();
+            const doc = { title, titleHtml: '', blocks: [], stats: { chars: 0 } };
+            state.model = { doc, pages: [], total: state.freePages, cover: false, coverFs: null, titleLine: null, free: true };
+            state.selected = Math.min(state.selected, state.freePages - 1);
+            renderPreview();
+            updateStats();
+            renderPageList();
+            $('#draftTitle').textContent = draftTitle() || '未命名草稿';
+            save();
+            return;
+        }
         const doc = Markdown.parse(state.text);
         await Images.resolveAll([
             ...doc.blocks.flatMap((b) => (b.type === 'img' ? [b.src] : b.type === 'imgrow' ? b.items.map((it) => it.src) : [])),
@@ -240,7 +267,9 @@
         const { model } = state;
         const s = state.settings;
         let el;
-        if (model.cover && i === 0) {
+        if (model.free) {
+            el = Render.canvasShell(s, { index: i, total: model.total });
+        } else if (model.cover && i === 0) {
             el = Render.coverShell(s, model.doc, model.total);
             el.querySelector('.cv-title').style.setProperty('--cv-fs', model.coverFs + 'px');
         } else {
@@ -346,6 +375,10 @@
     }
 
     function updateStats() {
+        if (isFree()) {
+            $('#stats').textContent = `自由排版 · ${state.model.total} 页 · ${state.stickers.length} 个元素`;
+            return;
+        }
         const { chars } = state.model.doc.stats;
         const mins = Math.max(1, Math.round(chars / 400));
         const total = state.model.total;
@@ -569,13 +602,21 @@
 
     function draftTitle() {
         if (!state.model) return '';
+        if (isFree()) return state.freeTitle.trim() || '自由排版';
         return state.model.doc.title || state.text.trim().split('\n')[0].replace(/^[#>\-*\s]+/, '').slice(0, 24);
     }
 
     const saveNow = () => {
         if (!state.model) return;
         const title = draftTitle();
-        const ok = Store.drafts.save(state.draftId, { title, text: state.text, settings: state.settings, stickers: state.stickers });
+        const ok = Store.drafts.save(state.draftId, {
+            title,
+            text: state.text,
+            settings: state.settings,
+            stickers: state.longStk,
+            mode: state.mode,
+            free: { pages: state.freePages, title: state.freeTitle, stickers: state.freeStk },
+        });
         Store.local.set('current', state.draftId);
         $('#saveState').textContent = ok ? '已自动保存' : '未能保存（浏览器存储不可用或已满）';
     };
@@ -595,15 +636,28 @@
         return list;
     }
 
+    /** 把一篇草稿的内容放进 state（不含刷新界面） */
+    function applyDraft(d) {
+        state.text = d.text || '';
+        state.longStk = stickersOf(d);
+        state.settings = mergeSettings(d.settings);
+        const free = d.free || {};
+        state.freeStk = free.stickers || [];
+        state.freePages = Math.max(1, free.pages || 1);
+        state.freeTitle = free.title || '';
+        state.mode = d.mode === 'free' ? 'free' : 'long';
+        state.sel = null;
+        state.selected = 0;
+        ed.value = state.text;
+        $('#freeTitle').value = state.freeTitle;
+        syncMode();
+    }
+
     function loadDraft(id) {
         const d = Store.drafts.load(id);
         if (!d) return;
         state.draftId = id;
-        state.text = d.text || '';
-        state.stickers = stickersOf(d);
-        state.settings = mergeSettings(d.settings);
-        state.sel = null;
-        ed.value = state.text;
+        applyDraft(d);
         syncSettingsUI();
         update();
     }
@@ -613,12 +667,146 @@
         state.draftId = Store.drafts.newId();
         state.text = text;
         state.settings = mergeSettings({ ...state.settings, cover: { ...state.settings.cover, title: '', subtitle: '', badge: '' } });
-        state.stickers = [];
+        state.longStk = [];
+        state.freeStk = [];
+        state.freePages = 1;
+        state.freeTitle = '';
         state.sel = null;
+        state.selected = 0;
         ed.value = text;
+        $('#freeTitle').value = '';
         syncSettingsUI();
         update();
-        ed.focus();
+        if (!isFree()) ed.focus();
+    }
+
+    /* ================================================================ 自由排版模式 */
+
+    /** 根据当前模式切换界面：左边是编辑器还是素材栏，右边是主题还是画布 */
+    function syncMode() {
+        document.body.classList.toggle('mode-free', isFree());
+        $$('#modeSeg button').forEach((b) => b.classList.toggle('on', b.dataset.mode === state.mode));
+        $('#mobileTabs [data-pane="editor"]').textContent = isFree() ? '素材' : '写作';
+    }
+
+    /** 第一次进入自由排版时放一页示例，方便看出能怎么玩（删掉或清空这一页就好） */
+    function starterPage() {
+        const INK = '#3a3326';
+        const id = () => Store.drafts.newId();
+        const base = { page: 0, shape: 'none', outline: false, shadow: false };
+        return [
+            { kind: 'deco', deco: 'note-paper', x: 560, y: 830, w: 780, rot: 2 },
+            { kind: 'deco', deco: 'tape-pink', x: 560, y: 560, w: 300, rot: -4 },
+            { kind: 'deco', deco: 'tape-sage', x: 250, y: 170, w: 420, rot: -9 },
+            { kind: 'text', text: '周末碎碎念', fs: 120, style: 'plain', color: null, font: 'round', bold: true, x: 540, y: 330, w: 900, rot: 0 },
+            { kind: 'text', text: '今天去了新开的咖啡店 ☕\n拿铁很好喝，下次还来！', fs: 50, style: 'plain', color: INK, font: 'kai', bold: false, x: 560, y: 820, w: 660, rot: 2 },
+            { kind: 'deco', deco: 'star', x: 900, y: 520, w: 150, rot: 12 },
+            { kind: 'deco', deco: 'sparkles', x: 170, y: 560, w: 170, rot: 0 },
+            { kind: 'deco', deco: 'heart', x: 230, y: 1190, w: 140, rot: -10 },
+            { kind: 'deco', deco: 'label', x: 800, y: 1200, w: 320, rot: -6 },
+        ].map((st) => ({ id: id(), ...base, ...st }));
+    }
+
+    function setMode(m) {
+        if (m === state.mode) return;
+        select(null);
+        state.mode = m;
+        state.selected = 0;
+        if (m === 'free' && !state.freeStk.length && state.freePages === 1 && !state.freeTitle) state.freeStk = starterPage();
+        syncMode();
+        syncSettingsUI();
+        update();
+        toast(m === 'free' ? '自由排版：不用写长文，文字、图片、贴纸随便摆' : '回到长文排版', 1800);
+    }
+
+    function renderPageList() {
+        const counts = Array.from({ length: state.freePages }, () => 0);
+        state.freeStk.forEach((st) => { counts[Math.min(st.page, state.freePages - 1)]++; });
+        const n = state.freePages;
+        $('#pageList').innerHTML = counts.map((c, i) => `
+            <div class="fp-page${i === state.selected ? ' on' : ''}" data-i="${i}">
+                <b>${i + 1}</b><span>${c ? `${c} 个元素` : '空白页'}</span>
+                <button data-pact="up" title="往前挪"${i === 0 ? ' disabled' : ''}>↑</button>
+                <button data-pact="down" title="往后挪"${i === n - 1 ? ' disabled' : ''}>↓</button>
+                <button data-pact="dup" title="复制这一页">复制</button>
+                <button data-pact="del" title="删除这一页">删除</button>
+            </div>`).join('');
+    }
+
+    function focusPage(i) {
+        state.selected = i;
+        markThumbs();
+        renderPageList();
+        const el = $(`#grid .thumb[data-i="${i}"]`);
+        if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+
+    async function pageAction(act, i) {
+        select(null);
+        const n = state.freePages;
+        const list = state.freeStk;
+        if (act === 'add') {
+            state.freePages++;
+            state.selected = n;
+        } else if (act === 'dup') {
+            list.forEach((st) => { if (st.page > i) st.page++; });
+            const copies = list.filter((st) => st.page === i).map((st) => ({ ...clone(st), id: Store.drafts.newId(), page: i + 1 }));
+            state.freeStk = [...list, ...copies];
+            state.freePages++;
+            state.selected = i + 1;
+        } else if (act === 'del') {
+            const here = list.filter((st) => Math.min(st.page, n - 1) === i);
+            if (here.length && !confirm(`这一页上有 ${here.length} 个元素，确定删除这一页吗？`)) return;
+            if (n === 1) {
+                state.freeStk = list.filter((st) => !here.includes(st));
+            } else {
+                state.freeStk = list.filter((st) => !here.includes(st));
+                state.freeStk.forEach((st) => { if (st.page > i) st.page--; });
+                state.freePages--;
+            }
+            dropUnused(here.flatMap((st) => [st.src, st.orig, st.full]));
+            state.selected = Math.min(i, state.freePages - 1);
+        } else if (act === 'up' || act === 'down') {
+            const j = i + (act === 'up' ? -1 : 1);
+            if (j < 0 || j >= n) return;
+            list.forEach((st) => {
+                const p = Math.min(st.page, n - 1);
+                if (p === i) st.page = j; else if (p === j) st.page = i;
+            });
+            state.selected = j;
+        }
+        await update();
+        focusPage(state.selected);
+    }
+
+    /** 自由排版里加图片：直接放到当前页，不强制裁剪、抠图（工具条上随时可以再做） */
+    async function addPhotos(files) {
+        const list = [...files].filter((f) => f.type.startsWith('image/'));
+        if (!list.length) return;
+        if (state.view !== 'grid') setView('grid');
+        if (matchMedia('(max-width: 820px)').matches) setPane('preview');
+        for (const f of list) {
+            try {
+                const id = await Images.add(f, { png: !/jpe?g/.test(f.type) });
+                const rec = Images.cache.get(id);
+                const w = rec.w >= rec.h ? 620 : 460;
+                addSticker({ kind: 'img', src: id, orig: id, cut: 0, w });
+            } catch (e) {
+                console.error(e);
+                toast('这张图片读取失败了，换一张试试？');
+            }
+        }
+        toast('图片已放上去：拖动摆位置，选中后可以加描边、裁剪、抠图', 2600);
+    }
+
+    function addDeco(id) {
+        const tape = id.startsWith('tape');
+        addSticker({ kind: 'deco', deco: id, w: tape ? 400 : id === 'note-paper' ? 520 : 220, rot: tape ? -8 : 0 });
+    }
+
+    function renderDecoList() {
+        $('#decoList').innerHTML = Stickers.DECOS.map(([id, name]) => `
+            <button data-deco="${id}" title="${name}"><span class="stk deco-prev">${Stickers.decoHtml({ deco: id })}</span></button>`).join('');
     }
 
     function renderDraftMenu() {
@@ -658,21 +846,36 @@
                 ${t.name}
             </button>`).join('');
 
+        $('#canvasList').innerHTML = Canvases.list.map((c) => `
+            <button class="theme-card canvas-card" data-canvas="${c.id}">
+                <span class="sw"><span class="pg canvas canvas-${c.id}"><span class="pg-bg"></span><span class="pg-deco">${c.deco || ''}</span></span></span>
+                ${c.name}
+            </button>`).join('');
+
         $('#badgeChips').innerHTML = BADGES.map((b) => `<button data-badge="${b}">${b}</button>`).join('');
         $('#colorMenu').innerHTML = TEXT_COLORS.map((c) => `<button data-color="${c}" style="background:${c}" title="${c}"></button>`).join('');
     }
 
+    /** 强调色：长文模式跟着主题，自由排版跟着画布 */
+    function accentSource() {
+        const s = state.settings;
+        return isFree()
+            ? { key: 'canvasAccent', accents: Canvases.get(s.canvas).accents }
+            : { key: 'accent', accents: Themes.get(s.theme).accents };
+    }
+
     function renderAccents() {
         const s = state.settings;
-        const theme = Themes.get(s.theme);
-        const current = s.accent || theme.accents[0];
+        const theme = accentSource();
+        const current = s[theme.key] || theme.accents[0];
         $('#accentList').innerHTML = theme.accents.map((c) => `<button data-accent="${c}" style="background:${c}" class="${c === current ? 'on' : ''}" title="${c}"></button>`).join('')
             + `<label title="自定义颜色" class="${theme.accents.includes(current) ? '' : 'on'}"><input type="color" id="accentPicker" value="${current}"></label>`;
     }
 
     function syncSettingsUI() {
         const s = state.settings;
-        $$('.theme-card').forEach((b) => b.classList.toggle('on', b.dataset.theme === s.theme));
+        $$('.theme-card[data-theme]').forEach((b) => b.classList.toggle('on', b.dataset.theme === s.theme));
+        $$('.theme-card[data-canvas]').forEach((b) => b.classList.toggle('on', b.dataset.canvas === s.canvas));
         renderAccents();
         const seg = (id, v) => $$(`#${id} button`).forEach((b) => b.classList.toggle('on', b.dataset.v === String(v)));
         seg('ratioSeg', s.ratio);
@@ -713,17 +916,26 @@
             schedule();
         });
 
+        $('#canvasList').addEventListener('click', (e) => {
+            const b = e.target.closest('[data-canvas]');
+            if (!b) return;
+            state.settings.canvas = b.dataset.canvas;
+            state.settings.canvasAccent = null;
+            syncSettingsUI();
+            schedule();
+        });
+
         $('#accentList').addEventListener('click', (e) => {
             const b = e.target.closest('[data-accent]');
             if (!b) return;
-            const theme = Themes.get(state.settings.theme);
-            state.settings.accent = b.dataset.accent === theme.accents[0] ? null : b.dataset.accent;
+            const src = accentSource();
+            state.settings[src.key] = b.dataset.accent === src.accents[0] ? null : b.dataset.accent;
             renderAccents();
             schedule();
         });
         $('#accentList').addEventListener('input', (e) => {
             if (e.target.id !== 'accentPicker') return;
-            state.settings.accent = e.target.value;
+            state.settings[accentSource().key] = e.target.value;
             $$('#accentList button').forEach((b) => b.classList.remove('on'));
             e.target.parentElement.classList.add('on');
             schedule();
@@ -994,7 +1206,7 @@
                     html += `<label class="cut-range" title="抠得不干净就往右拖，抠过头了就往左拖"><input type="range" data-act="strength" min="1" max="100" value="${st.cut}"></label>`;
                 }
             }
-            if (st.kind !== 'line') html += `<button data-act="outline" class="${st.outline ? 'on' : ''}" title="像真贴纸一样描一圈白边">白边</button>`;
+            if (st.kind !== 'line') html += `<select data-act="border" title="描边：拼贴风格">${opts(Stickers.BORDERS, Stickers.borderOf(st))}</select>`;
             html += `<button data-act="shadow" class="${st.shadow ? 'on' : ''}" title="投影">阴影</button><span class="sep"></span>`;
             html += `<button data-act="dup" title="复制一个">${ICON.copy}</button><button data-act="del" title="删除 (Delete)">${ICON.del}</button>`;
         } else {
@@ -1050,7 +1262,7 @@
             page,
             x: pw / 2 + (n % 4) * 60 - 90,
             y: ph * 0.42 + (n % 4) * 60 - 90,
-            w: { emoji: 180, text: 640, line: 420 }[props.kind] || 360,
+            w: { emoji: 180, text: 640, line: 420, deco: 220 }[props.kind] || 360,
             rot: 0,
             shape: 'none',
             outline: false,
@@ -1074,7 +1286,7 @@
 
     /** 没有任何贴纸再用到的图片，从存储里删掉 */
     function dropUnused(ids) {
-        const used = new Set(state.stickers.flatMap((x) => [x.src, x.orig, x.full]));
+        const used = new Set([...state.longStk, ...state.freeStk].flatMap((x) => [x.src, x.orig, x.full]));
         [...new Set(ids)].filter((k) => k && !used.has(k)).forEach((k) => Store.assets.remove(k));
     }
 
@@ -1602,6 +1814,7 @@
             case 'curve': st.curve = !st.curve; commitStickers(); break;
             case 'thick': st.thick = Number(b.value); commitStickers(); break;
             case 'outline': st.outline = !st.outline; commitStickers(); break;
+            case 'border': st.border = b.value; st.outline = false; commitStickers(); break;
             case 'shadow': st.shadow = !st.shadow; commitStickers(); break;
             case 'cut': cutSticker(st, st.cut ? 0 : 50); break;
             case 'strength': cutSticker(st, Number(b.value)); break;
@@ -1693,6 +1906,7 @@
             if (!t) return;
             state.selected = Number(t.dataset.i);
             markThumbs();
+            if (isFree()) renderPageList();
             if (dl) runExport('current');
         });
         $('#grid').addEventListener('pointerdown', onGridPointerDown);
@@ -1737,7 +1951,18 @@
         document.addEventListener('paste', (e) => {
             if (e.target.closest && e.target.closest('input, textarea, [contenteditable]')) return;
             const files = [...(e.clipboardData?.files || [])].filter((f) => f.type.startsWith('image/'));
-            if (files.length) { e.preventDefault(); addStickerImages(files); }
+            if (files.length) { e.preventDefault(); if (isFree()) addPhotos(files); else addStickerImages(files); }
+        });
+        // 自由排版：图片直接拖进预览区
+        $('#grid').addEventListener('dragover', (e) => {
+            if (isFree() && [...(e.dataTransfer?.items || [])].some((i) => i.kind === 'file')) e.preventDefault();
+        });
+        $('#grid').addEventListener('drop', (e) => {
+            if (!isFree() || !e.dataTransfer?.files?.length) return;
+            e.preventDefault();
+            const t = e.target.closest('.thumb');
+            if (t) state.selected = Number(t.dataset.i);
+            addPhotos(e.dataTransfer.files);
         });
         $('#stickerInput').addEventListener('change', (e) => { addStickerImages(e.target.files); e.target.value = ''; });
         $('#grid').addEventListener('dblclick', (e) => {
@@ -1758,6 +1983,42 @@
             const b = e.target.closest('[data-mode]');
             if (b) { state.phoneMode = b.dataset.mode; renderPhone(); }
         });
+
+        // 模式切换 & 自由排版的素材栏
+        $('#modeSeg').addEventListener('click', (e) => {
+            const b = e.target.closest('[data-mode]');
+            if (b) setMode(b.dataset.mode);
+        });
+        renderDecoList();
+        $('#freePanel').addEventListener('click', (e) => {
+            const add = e.target.closest('[data-add]');
+            const deco = e.target.closest('[data-deco]');
+            const line = e.target.closest('[data-fline]');
+            const pact = e.target.closest('[data-pact]');
+            const row = e.target.closest('.fp-page');
+            const toPreview = () => { if (matchMedia('(max-width: 820px)').matches) setPane('preview'); if (state.view !== 'grid') setView('grid'); };
+            if (add) {
+                e.stopPropagation();
+                const a = add.dataset.add;
+                if (a === 'photo') { $('#photoInput').click(); return; }
+                toPreview();
+                if (a === 'text') addText();
+                if (a === 'emoji') { toggleMenu($('#stickerMenu'), true); renderEmojiPicker(); }
+            } else if (deco) {
+                toPreview();
+                addDeco(deco.dataset.deco);
+            } else if (line) {
+                toPreview();
+                addLine(line.dataset.fline);
+            } else if (pact) {
+                pageAction(pact.dataset.pact, Number(pact.closest('.fp-page').dataset.i));
+            } else if (row) {
+                focusPage(Number(row.dataset.i));
+            }
+        });
+        $('#addPage').addEventListener('click', () => pageAction('add'));
+        $('#photoInput').addEventListener('change', (e) => { addPhotos(e.target.files); e.target.value = ''; });
+        $('#freeTitle').addEventListener('input', (e) => { state.freeTitle = e.target.value; schedule(); });
 
         // 顶栏
         $('#draftBtn').addEventListener('click', () => { renderDraftMenu(); toggleMenu($('#draftMenu')); });
@@ -1855,14 +2116,13 @@
         const draft = lastId && Store.drafts.load(lastId);
         if (draft) {
             state.draftId = lastId;
-            state.text = draft.text || '';
-            state.stickers = stickersOf(draft);
-            state.settings = mergeSettings(draft.settings);
+            applyDraft(draft);
         } else {
             state.draftId = Store.drafts.newId();
             state.text = SAMPLE;
+            ed.value = state.text;
+            syncMode();
         }
-        ed.value = state.text;
         syncSettingsUI();
 
         const font = await Store.assets.get('font:custom');
@@ -1889,6 +2149,8 @@
         exportPage: (i, scale = 1) => Exporter.toBlob(buildPage(i), scale),
         addSticker,
         select,
+        setMode,
+        pageAction,
         cutout: Stickers.cutout,
         aiCutout: Stickers.aiCutout,
         imageSize: (id) => { const r = Images.cache.get(id); return r && { w: r.w, h: r.h }; },

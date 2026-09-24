@@ -414,7 +414,7 @@ test('贴纸：添加、拖动、拖到别的页、调图层，导出和屏幕�
 
     // 形状和白边
     await page.locator('#objBar select[data-act="shape"]').selectOption('heart');
-    await page.locator('#objBar [data-act="outline"]').click();
+    await page.locator('#objBar select[data-act="border"]').selectOption('white');
     await page.waitForFunction(() => document.querySelector('#grid .stk.sh-heart.outline'));
 
     // 拖动贴纸：先在页内挪一下，再拖到封面上
@@ -521,6 +521,88 @@ test('文字和线条：输入文字、改样式，拖端点改长度和方向�
         const res = await fidelity(page, 1);
         assert.ok(res.ratio < 0.003, `${theme}：带文字和线条的页面导出差异 ${(res.ratio * 100).toFixed(2)}%`);
     }
+    assert.deepEqual(errors, []);
+    await context.close();
+});
+
+test('自由排版：切换模式、换画布、加图片和手帐素材、管理页面，导出一致，刷新后还在，长文不受影响', async () => {
+    const { page, context, errors } = await open();
+    const longText = await page.evaluate(() => Studio.state.text);
+    const longStickers = await page.evaluate(() => Studio.state.stickers.length);
+
+    await page.locator('#modeSeg [data-mode="free"]').click();
+    await page.waitForFunction(() => Studio.state.model.free);
+    assert.ok(await page.locator('#freePanel').isVisible(), '左边应该变成素材栏');
+    assert.ok(!(await page.locator('#editor').isVisible()), '编辑框应该隐藏');
+    assert.ok(await page.locator('#canvasList').isVisible(), '右边应该出现画布');
+    assert.ok(!(await page.locator('#themeList').isVisible()), '主题列表应该隐藏');
+    // 第一次进入有一页示例
+    let st = await page.evaluate(() => ({ n: Studio.state.stickers.length, pages: Studio.state.freePages }));
+    assert.equal(st.pages, 1);
+    assert.ok(st.n > 3, '应该放好一页示例');
+    assert.equal(await page.locator('#grid .thumb').count(), 1);
+
+    // 换画布
+    await page.locator('.canvas-card[data-canvas="gingham"]').click();
+    await page.waitForFunction(() => document.querySelector('#grid .pg.canvas-gingham'));
+
+    // 加一页，在第 2 页上加图片（不弹裁剪框，直接放上去）、胶带、描边
+    await page.locator('#addPage').click();
+    await page.waitForFunction(() => Studio.state.freePages === 2 && Studio.state.selected === 1);
+    const photo = await makeImage(page, 400, 300, '#e8a598', '#f6d186');
+    await page.evaluate(async (url) => {
+        const dt = new DataTransfer();
+        dt.items.add(new File([await (await fetch(url)).blob()], 'p.png', { type: 'image/png' }));
+        const input = document.getElementById('photoInput');
+        input.files = dt.files;
+        input.dispatchEvent(new Event('change'));
+    }, photo);
+    await page.waitForFunction(() => Studio.state.stickers.some((s) => s.kind === 'img' && s.page === 1));
+    assert.equal(await page.locator('#cropDialog[open]').count(), 0, '自由排版加图片不应该弹裁剪框');
+    await page.locator('#objBar select[data-act="border"]').selectOption('torn');
+    await page.waitForFunction(() => document.querySelector('#grid .stk.b-torn'));
+    await page.locator('#decoList [data-deco="tape-sage"]').click();
+    await page.locator('#decoList [data-deco="star"]').click();
+    st = await page.evaluate(() => Studio.state.stickers.filter((s) => s.page === 1).map((s) => s.deco || s.kind));
+    assert.deepEqual(st, ['img', 'tape-sage', 'star']);
+
+    // 复制第 2 页 → 第 3 页内容一样；把第 3 页挪到最前面；删掉它
+    await page.locator('.fp-page[data-i="1"] [data-pact="dup"]').click();
+    await page.waitForFunction(() => Studio.state.freePages === 3);
+    assert.equal(await page.evaluate(() => Studio.state.stickers.filter((s) => s.page === 2).length), 3);
+    await page.locator('.fp-page[data-i="2"] [data-pact="up"]').click();
+    await page.locator('.fp-page[data-i="1"] [data-pact="up"]').click();
+    await page.waitForFunction(() => Studio.state.stickers.filter((s) => s.page === 0).length === 3);
+    page.once('dialog', (d) => d.accept());
+    await page.locator('.fp-page[data-i="0"] [data-pact="del"]').click();
+    await page.waitForFunction(() => Studio.state.freePages === 2);
+    const pages = await page.evaluate(() => [0, 1].map((i) => Studio.state.stickers.filter((s) => s.page === i).length));
+    assert.ok(pages[0] > 3 && pages[1] === 3, `删掉后应该剩示例页和第 2 页：${pages}`);
+
+    // 导出和屏幕一致
+    await page.evaluate(() => Studio.select(null));
+    for (const i of [0, 1]) {
+        const res = await fidelity(page, i);
+        assert.ok(res.ratio < 0.003, `自由排版第 ${i + 1} 页：导出差异 ${(res.ratio * 100).toFixed(2)}%`);
+    }
+
+    // 刷新后还在自由排版；切回长文，文章和原来的贴纸都没变
+    await page.waitForTimeout(700);
+    await page.reload();
+    await page.evaluate(() => Studio.ready);
+    assert.equal(await page.evaluate(() => Studio.state.mode), 'free');
+    assert.equal(await page.evaluate(() => Studio.state.freePages), 2);
+    assert.ok(await page.locator('#grid .pg.canvas-gingham').count() > 0);
+    await page.locator('#modeSeg [data-mode="long"]').click();
+    await page.waitForFunction(() => !Studio.state.model.free);
+    assert.equal(await page.evaluate(() => Studio.state.text), longText);
+    assert.equal(await page.evaluate(() => Studio.state.stickers.length), longStickers);
+    assert.ok(await page.locator('#editor').isVisible());
+
+    // 手机预览也能显示自由排版的页面
+    await page.locator('#modeSeg [data-mode="free"]').click();
+    await page.locator('#viewSeg [data-view="phone"]').click();
+    await page.waitForFunction(() => document.querySelector('#phoneView .pg.canvas'));
     assert.deepEqual(errors, []);
     await context.close();
 });
