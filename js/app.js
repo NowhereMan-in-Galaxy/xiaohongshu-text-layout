@@ -17,7 +17,7 @@
     /* ================================================================ 默认值 */
 
     const DEFAULTS = {
-        theme: 'cream',
+        theme: 'memo',
         accent: null,
         ratio: '3:4',
         fontSize: 42,
@@ -921,7 +921,10 @@
         }
         el.classList.add('sel-obj');
         if (state.sel.kind === 'stk') {
-            el.insertAdjacentHTML('beforeend', '<i class="obj-h h-rot" data-h="rot" title="旋转"></i><i class="obj-h h-size" data-h="size" title="缩放"></i>');
+            const line = findSticker(state.sel.id)?.kind === 'line';
+            el.insertAdjacentHTML('beforeend', line
+                ? '<i class="obj-h h-end e0" data-h="e0" title="拖动端点"></i><i class="obj-h h-end e1" data-h="e1" title="拖动端点"></i>'
+                : '<i class="obj-h h-rot" data-h="rot" title="旋转"></i><i class="obj-h h-size" data-h="size" title="缩放"></i>');
         } else if (!el.closest('.row')) {
             const fig = el.closest('.fig');
             fig.insertAdjacentHTML('beforeend', `<i class="obj-h h-img${fig.classList.contains('al-right') ? ' left' : ''}" data-h="img" title="拖动调整大小"></i>`);
@@ -964,6 +967,21 @@
             const st = findSticker(sel.id);
             const i = state.stickers.indexOf(st);
             const isImg = st.kind === 'img';
+            const opts = (list, cur) => list.map(([v, n]) => `<option value="${v}"${cur === v ? ' selected' : ''}>${n}</option>`).join('');
+            const colors = () => '<span class="colors">' + Stickers.COLORS.map((c) => `<button data-act="color" data-v="${c || ''}" class="dot${(st.color || null) === c ? ' on' : ''}" title="${c ? c : '跟随主题色'}" style="--c:${c || 'var(--ui-brand)'}">${c ? '' : '主题'}</button>`).join('') + '</span><span class="sep"></span>';
+            if (st.kind === 'text') {
+                html += '<button data-act="edit" title="修改文字（也可以双击文字）">改字</button>';
+                html += `<select data-act="tstyle" title="样式">${opts(Stickers.TEXT_STYLES, st.style || 'plain')}</select>`;
+                html += `<select data-act="font" title="字体">${opts(Stickers.FONTS.map(([v, n]) => [v, n]), st.font || 'head')}</select>`;
+                html += `<button data-act="bold" class="${st.bold === false ? '' : 'on'}" title="粗体"><b>B</b></button><span class="sep"></span>`;
+                html += colors();
+            } else if (st.kind === 'line') {
+                html += `<select data-act="dash" title="线型">${opts(Stickers.DASHES, st.dash || 'solid')}</select>`;
+                html += `<select data-act="arrow" title="箭头">${opts(Stickers.ARROWS, st.arrow || 'none')}</select>`;
+                html += `<button data-act="curve" class="${st.curve ? 'on' : ''}" title="弯曲">弯曲</button>`;
+                html += `<label class="cut-range" title="粗细"><input type="range" data-act="thick" min="3" max="28" value="${st.thick || 8}"></label><span class="sep"></span>`;
+                html += colors();
+            }
             html += `<button data-act="up" title="上移一层"${i === state.stickers.length - 1 ? ' disabled' : ''}>${ICON.up}上移</button>`;
             html += `<button data-act="down" title="下移一层"${i === 0 ? ' disabled' : ''}>${ICON.down}下移</button><span class="sep"></span>`;
             if (isImg) {
@@ -976,7 +994,7 @@
                     html += `<label class="cut-range" title="抠得不干净就往右拖，抠过头了就往左拖"><input type="range" data-act="strength" min="1" max="100" value="${st.cut}"></label>`;
                 }
             }
-            html += `<button data-act="outline" class="${st.outline ? 'on' : ''}" title="像真贴纸一样描一圈白边">白边</button>`;
+            if (st.kind !== 'line') html += `<button data-act="outline" class="${st.outline ? 'on' : ''}" title="像真贴纸一样描一圈白边">白边</button>`;
             html += `<button data-act="shadow" class="${st.shadow ? 'on' : ''}" title="投影">阴影</button><span class="sep"></span>`;
             html += `<button data-act="dup" title="复制一个">${ICON.copy}</button><button data-act="del" title="删除 (Delete)">${ICON.del}</button>`;
         } else {
@@ -1032,7 +1050,7 @@
             page,
             x: pw / 2 + (n % 4) * 60 - 90,
             y: ph * 0.42 + (n % 4) * 60 - 90,
-            w: props.kind === 'emoji' ? 180 : 360,
+            w: { emoji: 180, text: 640, line: 420 }[props.kind] || 360,
             rot: 0,
             shape: 'none',
             outline: false,
@@ -1375,6 +1393,10 @@
         el.style.transform = `translate(${x - st.w / 2}px, ${y}px) translateY(-50%) rotate(${st.rot || 0}deg)`;
         const em = el.querySelector('.emoji');
         if (em) { em.style.fontSize = (st.w * 0.86).toFixed(1) + 'px'; em.style.lineHeight = st.w + 'px'; }
+        const txt = el.querySelector('.txt');
+        if (txt) txt.style.fontSize = st.fs + 'px';
+        const line = el.querySelector('svg.line');
+        if (line) line.outerHTML = Stickers.lineHtml(st);
     }
 
     /** 拖动贴纸；拖到别的页面上时，贴纸就跟着换到那一页 */
@@ -1414,10 +1436,12 @@
         const cx = r.left + r.width / 2;
         const cy = r.top + r.height / 2;
         const w0 = st.w;
+        const fs0 = st.fs;
         const d0 = Math.hypot(e.clientX - cx, e.clientY - cy) || 1;
         drag(e, (ev) => {
             if (mode === 'size') {
                 st.w = Math.round(clamp(w0 * Math.hypot(ev.clientX - cx, ev.clientY - cy) / d0, 40, pageSize()[0] * 1.5));
+                if (st.kind === 'text') st.fs = Math.max(12, Math.round(fs0 * st.w / w0));
             } else {
                 let a = Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180 / Math.PI + 90;
                 a = ((a + 540) % 360) - 180;
@@ -1427,6 +1451,78 @@
             place(el, st);
             placeBar();
         }, (moved) => { if (moved) commitStickers(); });
+    }
+
+    /** 拖线条的一个端点，另一个端点不动（角度接近 45° 的倍数时会吸附） */
+    function dragLineEnd(e, el, which) {
+        const st = findSticker(el.dataset.sid);
+        const frame = el.closest('.thumb-frame');
+        const k = zoomK();
+        const a0 = (st.rot || 0) * Math.PI / 180;
+        const s0 = which === 'e0' ? 1 : -1;
+        const fixed = { x: st.x + s0 * Math.cos(a0) * st.w / 2, y: st.y + s0 * Math.sin(a0) * st.w / 2 };
+        drag(e, (ev) => {
+            const r = frame.getBoundingClientRect();
+            const px = (ev.clientX - r.left) / k;
+            const py = (ev.clientY - r.top) / k;
+            // 线条方向始终是从 e0 指向 e1
+            const dx = (px - fixed.x) * -s0;
+            const dy = (py - fixed.y) * -s0;
+            let ang = Math.atan2(dy, dx) * 180 / Math.PI;
+            const snap = Math.round(ang / 45) * 45;
+            if (Math.abs(ang - snap) < 4) ang = snap;
+            const len = Math.max(40, Math.hypot(dx, dy));
+            const rad = ang * Math.PI / 180;
+            st.w = Math.round(len);
+            st.rot = Math.round(ang * 10) / 10;
+            st.x = Math.round(fixed.x - s0 * Math.cos(rad) * len / 2);
+            st.y = Math.round(fixed.y - s0 * Math.sin(rad) * len / 2);
+            place(el, st);
+            placeBar();
+        }, (moved) => { if (moved) commitStickers(); });
+    }
+
+    /** 在页面上直接改文字：变成可编辑状态，点别处或按 Esc 结束 */
+    function editText(el) {
+        const st = el && findSticker(el.dataset.sid);
+        const box = el?.querySelector('.txt span');
+        if (!st || !box || el.classList.contains('editing')) return;
+        el.classList.add('editing');
+        box.contentEditable = 'plaintext-only';
+        if (box.contentEditable !== 'plaintext-only') box.contentEditable = 'true';
+        box.focus();
+        const range = document.createRange();
+        range.selectNodeContents(box);
+        const selection = getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        box.addEventListener('input', placeBar);
+        box.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Escape' || (ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey))) { ev.preventDefault(); box.blur(); }
+        });
+        box.addEventListener('blur', () => {
+            const text = box.innerText.replace(/\n+$/, '');
+            if (!text.trim()) { removeSticker(st.id); return; }
+            st.text = text;
+            commitStickers();
+        }, { once: true });
+    }
+
+    function addText() {
+        const st = addSticker({ kind: 'text', text: '双击修改文字', fs: 72, style: 'plain', color: null, font: 'head', bold: true });
+        requestAnimationFrame(() => editText($(`#grid .stk[data-sid="${CSS.escape(st.id)}"]`)));
+    }
+
+    const LINES = {
+        dashed: { dash: 'dashed', arrow: 'none' },
+        arrow: { dash: 'solid', arrow: 'end' },
+        dashArrow: { dash: 'dashed', arrow: 'end' },
+        curve: { dash: 'solid', arrow: 'end', curve: true },
+        both: { dash: 'solid', arrow: 'both' },
+    };
+
+    function addLine(preset) {
+        addSticker({ kind: 'line', thick: 8, color: null, curve: false, ...LINES[preset] });
     }
 
     /** 拖图片右下角的圆点调整宽度（等比例），松手后写回 Markdown 里的 {xx%} */
@@ -1455,7 +1551,9 @@
         const h = e.target.closest('[data-h]');
         const stk = e.target.closest('.stk');
         const img = e.target.closest('.fig img');
+        if (e.target.closest('.stk.editing')) return;
         if (h && h.dataset.h === 'img') { resizeImage(e, h); return; }
+        if (h && (h.dataset.h === 'e0' || h.dataset.h === 'e1')) { dragLineEnd(e, h.closest('.stk'), h.dataset.h); return; }
         if (h) { resizeSticker(e, h.closest('.stk'), h.dataset.h); return; }
         if (stk) {
             if (state.sel?.id !== stk.dataset.sid) select({ kind: 'stk', id: stk.dataset.sid });
@@ -1478,6 +1576,9 @@
         const sel = state.sel;
         if (!sel) return;
         if (sel.kind === 'img') { editImage(act, b.dataset.v); return; }
+        // 正在改字时点了工具条：先把文字存好再执行
+        const editing = $('#grid .stk.editing [contenteditable]');
+        if (editing) editing.blur();
         const st = findSticker(sel.id);
         const i = state.stickers.indexOf(st);
         switch (act) {
@@ -1491,6 +1592,15 @@
                 break;
             }
             case 'shape': st.shape = b.value; commitStickers(); break;
+            case 'edit': editText(selectedEl()); break;
+            case 'color': st.color = b.dataset.v || null; commitStickers(); break;
+            case 'tstyle': st.style = b.value; commitStickers(); break;
+            case 'font': st.font = b.value; commitStickers(); break;
+            case 'bold': st.bold = st.bold === false; commitStickers(); break;
+            case 'dash': st.dash = b.value; commitStickers(); break;
+            case 'arrow': st.arrow = b.value; commitStickers(); break;
+            case 'curve': st.curve = !st.curve; commitStickers(); break;
+            case 'thick': st.thick = Number(b.value); commitStickers(); break;
             case 'outline': st.outline = !st.outline; commitStickers(); break;
             case 'shadow': st.shadow = !st.shadow; commitStickers(); break;
             case 'cut': cutSticker(st, st.cut ? 0 : 50); break;
@@ -1524,6 +1634,8 @@
         const open = force !== undefined ? force : menu.hidden;
         $$('.menu').forEach((m) => { if (m !== menu) m.hidden = true; });
         menu.hidden = !open;
+        // 菜单打开时收起贴纸的浮动工具条，免得挡住菜单
+        if (open && state.sel) select(null);
         const btn = menu.parentElement.querySelector('[aria-haspopup]');
         if (btn) btn.setAttribute('aria-expanded', String(open));
     }
@@ -1587,8 +1699,22 @@
         $('#grid').addEventListener('scroll', placeBar, { passive: true });
         window.addEventListener('resize', placeBar);
         $('#objBar').addEventListener('click', onBarAction);
+        // 点工具条按钮时不要抢走焦点，这样改字的时候也能直接换颜色
+        $('#objBar').addEventListener('mousedown', (e) => { if (!e.target.closest('select, input')) e.preventDefault(); });
         $('#objBar').addEventListener('change', onBarAction);
         $('#stickerBtn').addEventListener('click', () => toggleMenu($('#stickerMenu')));
+        $('#textBtn').addEventListener('click', addText);
+        $('#lineBtn').addEventListener('click', () => toggleMenu($('#lineMenu')));
+        $('#lineMenu').addEventListener('click', (e) => {
+            const b = e.target.closest('[data-line]');
+            if (!b) return;
+            toggleMenu($('#lineMenu'), false);
+            addLine(b.dataset.line);
+        });
+        $('#grid').addEventListener('dblclick', (e) => {
+            const el = e.target.closest('.stk.k-text');
+            if (el && state.view === 'grid') editText(el);
+        });
         $('#stickerBtn').addEventListener('click', () => { if (!$('#stickerMenu').hidden) renderEmojiPicker(); });
         renderEmojiPicker();
         $('#stickerMenu').addEventListener('click', (e) => {

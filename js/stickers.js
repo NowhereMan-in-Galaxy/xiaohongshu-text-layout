@@ -1,5 +1,5 @@
 /*
- * 贴纸 —— 浮在页面最上层、可以自由拖动的小图片或表情
+ * 贴纸 —— 浮在页面最上层、可以自由拖动的小图片、表情、文字和线条（虚线、箭头）
  *
  * 贴纸不参与分页：它们记在「第几页」上，位置用页面像素表示（页面宽 1080）。
  * 列表里越靠后的贴纸越靠上层，「上移一层 / 下移一层」就是在列表里交换位置。
@@ -36,6 +36,70 @@ const Stickers = (() => {
         ['flower', '花朵'],
     ];
 
+    // 文字和线条可选的颜色，null 表示跟随主题色
+    const COLORS = [null, '#1c1c1e', '#ffffff', '#ff3b30', '#ff2d78', '#ff9500', '#ffcc00', '#34c759', '#007aff', '#af52de'];
+    const FONTS = [
+        ['head', '标题字体', 'var(--font-head)'],
+        ['sans', '黑体', 'var(--sans)'],
+        ['kai', '楷体', 'var(--kai)'],
+        ['round', '圆体', 'var(--round)'],
+        ['brush', '毛笔', 'var(--brush)'],
+    ];
+    const TEXT_STYLES = [['plain', '纯文字'], ['label', '色块'], ['mark', '荧光笔']];
+    const DASHES = [['solid', '实线'], ['dashed', '虚线'], ['dotted', '点线']];
+    const ARROWS = [['none', '无箭头'], ['end', '单箭头'], ['both', '双箭头']];
+
+    const colorOf = (st) => st.color || 'var(--accent)';
+
+    function textHtml(st) {
+        const c = colorOf(st);
+        const font = (FONTS.find((f) => f[0] === st.font) || FONTS[0])[2];
+        const style = st.style || 'plain';
+        let span = '';
+        let color = c;
+        if (style === 'label') {
+            color = st.color ? Render.inkOn(st.color) : 'var(--accent-ink)';
+            span = `background:${c}`;
+        } else if (style === 'mark') {
+            color = 'var(--ink)';
+            span = `--mk:${st.color ? `color-mix(in srgb, ${st.color} 45%, transparent)` : 'var(--hl)'}`;
+        }
+        return `<div class="stk-in txt t-${style}" style="font-size:${st.fs}px;font-family:${font};font-weight:${st.bold === false ? 400 : 700};color:${color}"><span style="${span}">${esc(st.text)}</span></div>`;
+    }
+
+    /**
+     * 线条画在一个宽 w 的盒子里：两个端点在盒子左右两边的正中间，
+     * 所以贴纸的 x/y 就是线段中点、w 是长度、rot 是方向；弯线向上鼓起
+     */
+    function lineHtml(st) {
+        const w = st.w;
+        const t = st.thick || 8;
+        const bulge = st.curve ? w * 0.2 : 0;
+        const H = Math.max(56, Math.round(2 * bulge + t * 4));
+        const m = H / 2;
+        const cy = m - 2 * bulge;
+        const d = st.curve ? `M0 ${m} Q${w / 2} ${cy} ${w} ${m}` : `M0 ${m} L${w} ${m}`;
+        const dash = { dashed: `stroke-dasharray:${t * 1.6} ${t * 2.6}`, dotted: `stroke-dasharray:0 ${t * 2.2}` }[st.dash] || '';
+        const len = Math.max(t * 3.2, 28);
+        const head = (px, py, ux, uy) => {
+            const n = Math.hypot(ux, uy) || 1;
+            ux /= n; uy /= n;
+            const a = Math.PI / 6.5;
+            const p = (s) => {
+                const cx = -(ux * Math.cos(s * a) - uy * Math.sin(s * a));
+                const cy2 = -(ux * Math.sin(s * a) + uy * Math.cos(s * a));
+                return `${(px + cx * len).toFixed(1)} ${(py + cy2 * len).toFixed(1)}`;
+            };
+            return `M${p(1)} L${px} ${py} L${p(-1)}`;
+        };
+        let heads = '';
+        if (st.arrow === 'end' || st.arrow === 'both') heads += head(w, m, w / 2, m - cy);
+        if (st.arrow === 'both') heads += head(0, m, -w / 2, m - cy);
+        const svgStyle = `stroke:${colorOf(st)};stroke-width:${t}px;aspect-ratio:${w}/${H}`;
+        return `<svg class="stk-in line" viewBox="0 0 ${w} ${H}" style="${svgStyle}" fill="none" stroke-linecap="round" stroke-linejoin="round">`
+            + `<path d="${d}" style="${dash}"/>${heads ? `<path d="${heads}"/>` : ''}</svg>`;
+    }
+
     /** 某一页上的贴纸（页数变少时，超出的贴纸显示在最后一页，不会丢） */
     function onPage(list, i, total) {
         return list.filter((s) => Math.min(s.page, total - 1) === i);
@@ -44,10 +108,14 @@ const Stickers = (() => {
     function html(st, images, [pw, ph]) {
         const x = Math.max(0, Math.min(pw, st.x));
         const y = Math.max(0, Math.min(ph, st.y));
-        const cls = ['stk', st.shape && st.shape !== 'none' ? 'sh-' + st.shape : '', st.outline ? 'outline' : '', st.shadow ? 'shadow' : ''].filter(Boolean).join(' ');
+        const cls = ['stk', 'k-' + st.kind, st.shape && st.shape !== 'none' ? 'sh-' + st.shape : '', st.outline ? 'outline' : '', st.shadow ? 'shadow' : ''].filter(Boolean).join(' ');
         const pos = `width:${st.w}px;transform:translate(${x - st.w / 2}px, ${y}px) translateY(-50%) rotate(${st.rot || 0}deg)`;
         let inner;
-        if (st.kind === 'emoji') {
+        if (st.kind === 'text') {
+            inner = textHtml(st);
+        } else if (st.kind === 'line') {
+            inner = lineHtml(st);
+        } else if (st.kind === 'emoji') {
             inner = `<span class="stk-in emoji" style="font-size:${(st.w * 0.86).toFixed(1)}px;line-height:${st.w}px">${esc(st.text)}</span>`;
         } else {
             const im = images.get(st.src);
@@ -323,5 +391,5 @@ const Stickers = (() => {
         return { ...applyAlpha(c, g, im, alpha, url), removed: removed / (W * H) };
     }
 
-    return { EMOJI_CATS, SHAPES, onPage, layer, cutout, aiCutout, hasTransparency };
+    return { EMOJI_CATS, SHAPES, COLORS, FONTS, TEXT_STYLES, DASHES, ARROWS, onPage, layer, lineHtml, cutout, aiCutout, hasTransparency };
 })();

@@ -144,7 +144,8 @@ const Render = (() => {
         ].filter(Boolean).join(' ');
         for (const [k, v] of Object.entries(pageStyle(s))) el.style.setProperty(k, v);
 
-        const deco = opt.cover ? (theme.coverDeco ?? theme.deco ?? '') : (theme.deco || '');
+        const pick = opt.cover ? (theme.coverDeco ?? theme.deco ?? '') : (theme.deco || '');
+        const deco = typeof pick === 'function' ? pick(s) : pick;
         let html = `<div class="pg-bg"></div><div class="pg-deco">${deco}</div>`;
         if (!opt.cover) {
             if (header) html += `<div class="pg-header"><span>${esc(header)}</span></div>`;

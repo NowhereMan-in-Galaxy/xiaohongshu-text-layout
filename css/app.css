@@ -642,6 +642,9 @@ button {
     color: var(--ui-muted);
 }
 
+.line-menu { width: 220px; }
+.line-menu .tip { font-size: 12px; line-height: 1.5; white-space: normal; }
+
 .sticker-menu .tip {
     font-size: 12px;
     line-height: 1.5;
@@ -701,6 +704,26 @@ button {
     transform: translateX(-50%);
 }
 
+.obj-h.h-end {
+    top: 50%;
+    cursor: crosshair;
+}
+
+.obj-h.h-end.e0 { left: 0; transform: translate(-50%, -50%); }
+.obj-h.h-end.e1 { right: 0; transform: translate(50%, -50%); }
+
+#grid .stk.editing,
+#grid .stk.editing * {
+    cursor: text;
+    user-select: text;
+    -webkit-user-select: text;
+}
+
+#grid .stk.editing [contenteditable] {
+    outline: none;
+    caret-color: var(--ui-brand);
+}
+
 .obj-h.h-img {
     transform: translate(-50%, -50%);
     cursor: nwse-resize;
@@ -728,8 +751,10 @@ body.dragging * {
     box-shadow: var(--ui-shadow);
     font-size: 12px;
     white-space: nowrap;
-    max-width: calc(100vw - 16px);
-    overflow-x: auto;
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: 4px;
+    max-width: min(600px, calc(100vw - 16px));
 }
 
 .objbar button,
@@ -754,6 +779,20 @@ body.dragging * {
 .objbar .sep { width: 1px; height: 18px; background: var(--ui-line); margin: 0 3px; }
 .objbar .pct { min-width: 40px; text-align: center; color: var(--ui-muted); font-variant-numeric: tabular-nums; }
 .objbar .cut-range input { width: 80px; vertical-align: middle; }
+.objbar .colors { display: inline-flex; align-items: center; gap: 3px; padding: 0 2px; }
+.objbar button.dot {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border-radius: 50%;
+    background: var(--c);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+    justify-content: center;
+    font-size: 0;
+}
+.objbar button.dot:first-child { width: auto; padding: 0 7px; border-radius: 10px; font-size: 11px; color: #fff; }
+.objbar button.dot:hover:not(:disabled) { background: var(--c); filter: brightness(1.08); }
+.objbar button.dot.on { box-shadow: 0 0 0 2px var(--ui-panel), 0 0 0 4px var(--ui-brand); }
 
 /* 设置区 */
 .settings-pane {
@@ -1569,7 +1608,10 @@ input[type="range"] {
     .toolbar .grow { display: none; }
     #editor { font-size: 16px; padding: 16px; }
 
-    .preview-head { padding: 10px 16px; }
+    .preview-head { padding: 10px 16px; gap: 8px; }
+    /* 手机上预览区顶部放不下文字，只留图标 */
+    #stickerBtn, #textBtn, #lineBtn { font-size: 0; gap: 0; padding: 0 9px; }
+    #pageInfo, .preview-head .zoom { display: none; }
     .grid { padding: 6px 16px 30px; gap: 20px 16px; }
 
     .phone-view .phone-switch { order: -1; }

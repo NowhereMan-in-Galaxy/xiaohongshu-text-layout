@@ -270,7 +270,7 @@ async function fidelity(page, idx) {
 
 test('导出的 PNG 尺寸正确，并且和屏幕上的渲染逐像素一致', async () => {
     const { page, context } = await open();
-    for (const theme of ['cream', 'night', 'grid', 'candy']) {
+    for (const theme of ['memo', 'cream', 'night', 'grid', 'candy']) {
         await page.evaluate((t) => Studio.setSettings({ theme: t }), theme);
         for (const i of [0, 1]) {
             const result = await fidelity(page, i);
@@ -444,6 +444,75 @@ test('贴纸：添加、拖动、拖到别的页、调图层，导出和屏幕�
     await page.reload();
     await page.evaluate(() => window.Studio.ready);
     assert.equal(await page.locator('#grid .stk').count(), 1);
+    assert.deepEqual(errors, []);
+    await context.close();
+});
+
+test('文字和线条：输入文字、改样式，拖端点改长度和方向，导出和屏幕一致', async () => {
+    const { page, context, errors } = await open();
+    await page.evaluate(() => { Studio.state.selected = 1; });
+
+    // 加文字：直接进入编辑状态，打字后点别处保存
+    await page.locator('#textBtn').click();
+    await page.locator('#grid .stk.editing').waitFor();
+    await page.keyboard.type('划重点');
+    await page.locator('#pageInfo').click();
+    await page.waitForFunction(() => Studio.state.stickers[0]?.text === '划重点');
+    let st = await page.evaluate(() => Studio.state.stickers[0]);
+    assert.equal(st.kind, 'text');
+    assert.equal(st.page, 1);
+
+    // 双击再改一次，Esc 结束；然后换成红色色块
+    const txt = page.locator('#grid .stk.k-text');
+    await txt.dblclick();
+    await page.locator('#grid .stk.editing').waitFor();
+    await page.keyboard.type('一定要看');
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => Studio.state.stickers[0].text === '一定要看');
+    await txt.click();
+    await page.locator('#objBar select[data-act="tstyle"]').selectOption('label');
+    await page.locator('#objBar [data-act="color"][data-v="#ff3b30"]').click();
+    st = await page.evaluate(() => Studio.state.stickers[0]);
+    assert.equal(st.style, 'label');
+    assert.equal(st.color, '#ff3b30');
+    assert.equal(await page.locator('#grid .stk.k-text .t-label').count(), 1);
+
+    // 拖右下角放大，字号跟着变大
+    const fs0 = st.fs;
+    const size = await page.locator('#grid .obj-h.h-size').boundingBox();
+    await page.mouse.move(size.x + size.width / 2, size.y + size.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(size.x + 60, size.y + 30, { steps: 5 });
+    await page.mouse.up();
+    assert.ok(await page.evaluate((f) => Studio.state.stickers[0].fs > f, fs0), '放大后字号应该变大');
+
+    // 虚线箭头：拖右端点到正下方，方向吸附成 90°
+    await page.locator('#lineBtn').click();
+    await page.locator('#lineMenu [data-line="dashArrow"]').click();
+    st = await page.evaluate(() => Studio.state.stickers[1]);
+    assert.deepEqual([st.kind, st.dash, st.arrow], ['line', 'dashed', 'end']);
+    const k = await page.evaluate(() => Studio.state.zoom / 1080);
+    const left = { x: st.x - st.w / 2, y: st.y };
+    const frame = await page.locator('#grid .thumb-frame').nth(1).boundingBox();
+    const e1 = await page.locator('#grid .obj-h.e1').boundingBox();
+    await page.mouse.move(e1.x + e1.width / 2, e1.y + e1.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(frame.x + (left.x + 2) * k, frame.y + (left.y + 300) * k, { steps: 6 });
+    await page.mouse.up();
+    st = await page.evaluate(() => Studio.state.stickers[1]);
+    assert.equal(st.rot, 90, `角度应该吸附到 90°，实际 ${st.rot}`);
+    assert.ok(Math.abs(st.w - 300) < 14, `长度应该约 300，实际 ${st.w}`);
+    // 左端点没动
+    assert.ok(Math.abs(st.x - left.x) < 3 && Math.abs(st.y - st.w / 2 - left.y) < 4, '另一个端点应该保持不动');
+    await page.locator('#objBar [data-act="curve"]').click();
+    await page.locator('#objBar select[data-act="arrow"]').selectOption('both');
+    assert.equal(await page.locator('#grid .stk.k-line path').count(), 2, '线 + 箭头');
+
+    for (const theme of ['memo', 'night']) {
+        await page.evaluate((t) => { Studio.setSettings({ theme: t }); Studio.select(null); }, theme);
+        const res = await fidelity(page, 1);
+        assert.ok(res.ratio < 0.003, `${theme}：带文字和线条的页面导出差异 ${(res.ratio * 100).toFixed(2)}%`);
+    }
     assert.deepEqual(errors, []);
     await context.close();
 });

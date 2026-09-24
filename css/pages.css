@@ -513,6 +513,139 @@
  * 主题
  * ================================================================== */
 
+/* 0. 备忘录 —— iPhone 备忘录截图：状态栏、黄色返回键、底部工具栏 */
+.theme-memo {
+    --bg: #ffffff;
+    --ink: #1c1c1e;
+    --muted: #8e8e93;
+    --accent: #e3a008;
+    --hl: color-mix(in srgb, var(--accent) 34%, transparent);
+    --rule: #e5e5ea;
+    --soft: transparent;
+    --code-bg: #f2f2f7;
+    --quote-ink: #3a3a3c;
+    --pad-x: 72px;
+    --pt: 300px;
+    --pb: 270px;
+}
+
+.pg.theme-memo.r-wide {
+    --pad-t: 280px;
+    --pad-b: 230px;
+}
+
+.theme-memo .ios-status {
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 132px;
+    padding: 30px 64px 0 112px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #000;
+    font: 600 46px/1 var(--sans);
+    letter-spacing: -0.01em;
+}
+
+.theme-memo .ios-status span {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.theme-memo .ios-nav {
+    left: 0;
+    right: 0;
+    top: 132px;
+    height: 112px;
+    padding: 0 48px 0 30px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--accent);
+    font: 400 50px/1 var(--sans);
+}
+
+.theme-memo .ios-nav .back {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.theme-memo .ios-nav .acts {
+    display: flex;
+    align-items: center;
+    gap: 52px;
+}
+
+.theme-memo .ios-date {
+    left: 0;
+    right: 0;
+    top: 262px;
+    text-align: center;
+    font: 400 30px/1 var(--sans);
+    color: var(--muted);
+}
+
+.theme-memo .ios-tool {
+    left: 64px;
+    right: 64px;
+    bottom: 76px;
+    height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--accent);
+}
+
+.theme-memo .ios-home {
+    left: 50%;
+    bottom: 24px;
+    width: 400px;
+    height: 14px;
+    margin-left: -200px;
+    border-radius: 7px;
+    background: #000;
+}
+
+.theme-memo .pg-footer { bottom: 186px; }
+.theme-memo .pg-header::before { border-radius: 3px; }
+.theme-memo .h1,
+.theme-memo .h2 { font-weight: 800; }
+.theme-memo .ul .mk i { background: var(--ink); width: 0.26em; height: 0.26em; }
+.theme-memo .li.d1 .mk i { background: transparent; box-shadow: inset 0 0 0 3px var(--ink); }
+.theme-memo .ol .mk { color: var(--ink); font-weight: 400; }
+.theme-memo .task .mk i {
+    width: 0.86em;
+    height: 0.86em;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 3px #c7c7cc;
+    vertical-align: -0.12em;
+}
+.theme-memo .task.done .mk i { box-shadow: none; }
+.theme-memo .quote {
+    border-left: 6px solid #d1d1d6;
+    border-radius: 0;
+    padding: 0.1em 0 0.1em 0.8em;
+}
+.theme-memo .tbl { border-radius: 0; border-color: #d1d1d6; }
+.theme-memo .tbl th { background: #f2f2f7; color: var(--ink); }
+.theme-memo .cv { top: 330px; justify-content: flex-start; padding-top: 30px; }
+.theme-memo .cv-title { font-weight: 800; line-height: 1.3; }
+.theme-memo .cv-title strong { color: inherit; }
+.theme-memo .cv-badge {
+    background: none;
+    color: var(--accent);
+    padding: 0;
+    margin-bottom: 36px;
+    font-weight: 500;
+    font-size: 38px;
+}
+.theme-memo .cv-badge::before { content: "#"; }
+.theme-memo .cv-sub { margin-top: 40px; color: #3a3a3c; }
+.theme-memo .cv-meta { bottom: -52px; }
+
 /* 1. 奶油手帐 —— 米色点阵纸 + 和纸胶带 */
 .theme-cream {
     --bg: #fbf5ea;
@@ -1156,6 +1289,35 @@
 .stk.sh-heart .stk-in { clip-path: polygon(50% 96%, 18% 70%, 4% 48%, 2% 30%, 8% 14%, 20% 5%, 34% 4%, 45% 10%, 50% 18%, 55% 10%, 66% 4%, 80% 5%, 92% 14%, 98% 30%, 96% 48%, 82% 70%); }
 .stk.sh-star .stk-in { clip-path: polygon(50% 2%, 62% 36%, 98% 37%, 69% 59%, 80% 95%, 50% 74%, 20% 95%, 31% 59%, 2% 37%, 38% 36%); }
 .stk.sh-flower .stk-in { clip-path: polygon(50% 0%, 61% 13%, 76% 7%, 80% 23%, 96% 25%, 91% 40%, 100% 50%, 91% 60%, 96% 75%, 80% 77%, 76% 93%, 61% 87%, 50% 100%, 39% 87%, 24% 93%, 20% 77%, 4% 75%, 9% 60%, 0% 50%, 9% 40%, 4% 25%, 20% 23%, 24% 7%, 39% 13%); }
+
+/* 文字贴纸：宽度固定，文字居中、自动换行 */
+.stk .txt {
+    text-align: center;
+    line-height: 1.3;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+}
+
+.stk .txt span {
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+}
+
+.stk .t-label span {
+    padding: 0.08em 0.4em;
+    border-radius: 0.28em;
+    line-height: 1.5;
+}
+
+.stk .t-mark span {
+    background: linear-gradient(transparent 52%, var(--mk) 52%, var(--mk) 92%, transparent 92%);
+    padding: 0 0.1em;
+}
+
+/* 线条（虚线、箭头）：端点可以超出盒子一点点，箭头不会被切掉 */
+.stk svg.line {
+    overflow: visible;
+}
 
 /* 白边：像真的贴纸一样，沿着形状（或抠图后的轮廓）描一圈白边 */
 .stk.outline {

@@ -158,6 +158,22 @@
                             <div class="label tip">💡 iPhone / Mac：在「照片」里长按主体选「拷贝」，再回来点「粘贴图片做贴纸」，就能直接用苹果抠好的图。<br>拖动贴纸摆位置，拖到别的页面上就换页；拖右下角缩放、拖顶上的圆点旋转。</div>
                         </div>
                     </div>
+                    <button class="btn small" id="textBtn" title="在页面上加一段文字，可以自由拖动">
+                        <svg class="i" viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></svg>文字
+                    </button>
+                    <div class="dropdown" id="lineDrop">
+                        <button class="btn small" id="lineBtn" title="加虚线、箭头">
+                            <svg class="i" viewBox="0 0 24 24"><path d="M4 20L20 4M11 4h9v9"/></svg>线条
+                        </button>
+                        <div class="menu line-menu" id="lineMenu" hidden>
+                            <button data-line="dashed"><svg class="i" viewBox="0 0 24 24"><path d="M3 12h3M10.5 12h3M18 12h3"/></svg>虚线</button>
+                            <button data-line="arrow"><svg class="i" viewBox="0 0 24 24"><path d="M3 12h18M15 6l6 6-6 6"/></svg>箭头</button>
+                            <button data-line="dashArrow"><svg class="i" viewBox="0 0 24 24"><path d="M3 12h2.5M9 12h2.5M15 12h6M15 6l6 6-6 6"/></svg>虚线箭头</button>
+                            <button data-line="curve"><svg class="i" viewBox="0 0 24 24"><path d="M3 17C7 7 15 7 20 13M20 7v6h-6"/></svg>弯箭头</button>
+                            <button data-line="both"><svg class="i" viewBox="0 0 24 24"><path d="M3 12h18M8 7l-5 5 5 5M16 7l5 5-5 5"/></svg>双向箭头</button>
+                            <div class="label tip">拖两头的圆点改长短和方向，接近水平、竖直或 45° 时会自动对齐。</div>
+                        </div>
+                    </div>
                     <span id="pageInfo" class="muted"></span>
                     <label class="zoom" title="缩放预览">
                         <svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4M8.5 11h5"/></svg>
