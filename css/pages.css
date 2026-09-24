@@ -379,6 +379,46 @@
     max-height: calc(var(--body-h) - 2.4em);
 }
 
+.img-missing {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.2em;
+    border: 3px dashed var(--rule);
+    border-radius: 20px;
+    color: var(--muted);
+    font-size: 0.7em;
+}
+
+/* 单张图靠左 / 靠右 */
+.fig.al-left img { margin-left: 0; }
+.fig.al-right img { margin-right: 0; }
+.fig.al-left { text-align: left; }
+.fig.al-right { text-align: right; }
+
+/* 多张图并排 */
+.fig.row .row-in {
+    display: flex;
+    align-items: flex-start;
+    margin: 0 auto;
+}
+
+.fig.row .cell {
+    min-width: 0;
+}
+
+.fig.row img,
+.fig.row .img-missing {
+    width: 100%;
+    max-height: none;
+}
+
+.fig.row figcaption {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .fig figcaption {
     margin-top: 0.4em;
     font-size: 0.66em;
@@ -1075,4 +1115,68 @@
     margin-left: -1.5px;
     background: linear-gradient(var(--ink), transparent);
     opacity: 0.5;
+}
+
+/* ------------------------------------------------------------------ 贴纸
+ * 贴纸浮在页面最上层，可以自由摆放，不参与分页。
+ * 位置和大小都用页面像素（1080 宽）表示，所以预览和导出完全一致。
+ */
+.pg-stk {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.stk {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform-origin: 50% 50%;
+    line-height: 1;
+}
+
+.stk-in {
+    display: block;
+    width: 100%;
+}
+
+.stk img.stk-in {
+    height: auto;
+}
+
+.stk .emoji {
+    display: block;
+    text-align: center;
+    font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+}
+
+/* 形状：裁成正方形后套上形状 */
+.stk.sh-circle .stk-in,
+.stk.sh-rounded .stk-in,
+.stk.sh-heart .stk-in,
+.stk.sh-star .stk-in,
+.stk.sh-flower .stk-in,
+.stk.sh-arch .stk-in {
+    aspect-ratio: 1;
+    object-fit: cover;
+}
+
+.stk.sh-circle .stk-in { border-radius: 50%; }
+.stk.sh-rounded .stk-in { border-radius: 18%; }
+.stk.sh-arch .stk-in { aspect-ratio: 4 / 5; border-radius: 999px 999px 8% 8%; }
+.stk.sh-heart .stk-in { clip-path: polygon(50% 96%, 18% 70%, 4% 48%, 2% 30%, 8% 14%, 20% 5%, 34% 4%, 45% 10%, 50% 18%, 55% 10%, 66% 4%, 80% 5%, 92% 14%, 98% 30%, 96% 48%, 82% 70%); }
+.stk.sh-star .stk-in { clip-path: polygon(50% 2%, 62% 36%, 98% 37%, 69% 59%, 80% 95%, 50% 74%, 20% 95%, 31% 59%, 2% 37%, 38% 36%); }
+.stk.sh-flower .stk-in { clip-path: polygon(50% 0%, 61% 13%, 76% 7%, 80% 23%, 96% 25%, 91% 40%, 100% 50%, 91% 60%, 96% 75%, 80% 77%, 76% 93%, 61% 87%, 50% 100%, 39% 87%, 24% 93%, 20% 77%, 4% 75%, 9% 60%, 0% 50%, 9% 40%, 4% 25%, 20% 23%, 24% 7%, 39% 13%); }
+
+/* 白边：像真的贴纸一样，沿着形状（或抠图后的轮廓）描一圈白边 */
+.stk.outline {
+    filter:
+        drop-shadow(5px 0 0 #fff) drop-shadow(-5px 0 0 #fff)
+        drop-shadow(0 5px 0 #fff) drop-shadow(0 -5px 0 #fff)
+        drop-shadow(0 6px 10px rgba(0, 0, 0, 0.18));
+}
+
+.stk.shadow:not(.outline) {
+    filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.22));
 }

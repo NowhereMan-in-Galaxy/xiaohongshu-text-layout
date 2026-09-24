@@ -95,6 +95,8 @@
         caretPage: -1,
         zoom: 300,
         busy: false,
+        stickers: [], // 贴纸，见 js/stickers.js
+        sel: null, // 预览里选中的对象：{ kind: 'stk', id } 或 { kind: 'img', line, i }
     };
 
     const ed = $('#editor');
@@ -137,15 +139,23 @@
             });
         },
 
-        async resolveAll(blocks) {
-            const srcs = [...new Set(blocks.filter((b) => b.type === 'img').map((b) => b.src))];
+        async resolveAll(list) {
+            const srcs = [...new Set(list)];
             await Promise.all(srcs.filter((s) => !this.cache.has(s)).map(async (s) => {
                 this.cache.set(s, await this.load(s));
             }));
         },
 
-        /** 压缩并保存用户插入的图片，返回 img:xxx 引用 */
-        async add(file) {
+        /** 保存一张已经处理好的图片 {url, w, h}，返回 img:xxx 引用 */
+        async put(rec) {
+            const id = 'img:' + Store.drafts.newId();
+            await Store.assets.put(id, rec);
+            this.cache.set(id, rec);
+            return id;
+        },
+
+        /** 压缩并保存用户插入的图片，返回 img:xxx 引用。png: true 时保留透明背景（贴纸用） */
+        async add(file, { png = false } = {}) {
             const url = await readAsDataURL(file);
             const img = await new Promise((resolve, reject) => {
                 const i = new Image();
@@ -156,7 +166,14 @@
             let rec = { url, w: img.naturalWidth, h: img.naturalHeight };
             const MAX = 2000;
             const keep = (file.type === 'image/png' || file.type === 'image/gif') && file.size < 1.5e6;
-            if (!keep && (file.size > 6e5 || Math.max(rec.w, rec.h) > MAX)) {
+            if (png && Math.max(rec.w, rec.h) > 1200) {
+                const k = 1200 / Math.max(rec.w, rec.h);
+                const c = document.createElement('canvas');
+                c.width = Math.round(rec.w * k);
+                c.height = Math.round(rec.h * k);
+                c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+                rec = { url: c.toDataURL('image/png'), w: c.width, h: c.height };
+            } else if (!png && !keep && (file.size > 6e5 || Math.max(rec.w, rec.h) > MAX)) {
                 const k = Math.min(1, MAX / Math.max(rec.w, rec.h));
                 const c = document.createElement('canvas');
                 c.width = Math.round(rec.w * k);
@@ -167,10 +184,7 @@
                 ctx.drawImage(img, 0, 0, c.width, c.height);
                 rec = { url: c.toDataURL('image/jpeg', 0.88), w: c.width, h: c.height };
             }
-            const id = 'img:' + Store.drafts.newId();
-            await Store.assets.put(id, rec);
-            this.cache.set(id, rec);
-            return id;
+            return this.put(rec);
         },
     };
 
@@ -191,7 +205,10 @@
         const gen = ++generation;
         const s = state.settings;
         const doc = Markdown.parse(state.text);
-        await Images.resolveAll(doc.blocks);
+        await Images.resolveAll([
+            ...doc.blocks.flatMap((b) => (b.type === 'img' ? [b.src] : b.type === 'imgrow' ? b.items.map((it) => it.src) : [])),
+            ...state.stickers.filter((st) => st.src).map((st) => st.src),
+        ]);
         if (gen !== generation) return;
 
         // 开启封面且没有单独填写封面标题时，第一个 # 标题放到封面上，正文里不再重复
@@ -223,13 +240,16 @@
     function buildPage(i) {
         const { model } = state;
         const s = state.settings;
+        let el;
         if (model.cover && i === 0) {
-            const el = Render.coverShell(s, model.doc, model.total);
+            el = Render.coverShell(s, model.doc, model.total);
             el.querySelector('.cv-title').style.setProperty('--cv-fs', model.coverFs + 'px');
-            return el;
+        } else {
+            el = Render.shell(s, { index: i, total: model.total });
+            el.querySelector('.pg-body').innerHTML = model.pages[i - (model.cover ? 1 : 0)].html;
         }
-        const el = Render.shell(s, { index: i, total: model.total });
-        el.querySelector('.pg-body').innerHTML = model.pages[i - (model.cover ? 1 : 0)].html;
+        const stk = Stickers.layer(state.stickers, i, model.total, Images.cache, Render.size(s.ratio));
+        if (stk) el.appendChild(stk);
         return el;
     }
 
@@ -268,6 +288,8 @@
         }
         grid.replaceChildren(frag);
         grid.scrollTop = scroll;
+        grid.style.setProperty('--inv', (1 / k).toFixed(4));
+        decorate();
     }
 
     function rezoom() {
@@ -278,6 +300,8 @@
             f.style.height = Math.round(h * k) + 'px';
             f.firstElementChild.style.transform = `scale(${k})`;
         });
+        $('#grid').style.setProperty('--inv', (1 / k).toFixed(4));
+        placeBar();
     }
 
     function markThumbs() {
@@ -317,6 +341,8 @@
         $('#grid').hidden = v !== 'grid';
         $('#phoneView').hidden = v !== 'phone';
         $('.zoom').style.visibility = v === 'grid' ? '' : 'hidden';
+        $('#stickerDrop').hidden = v !== 'grid';
+        if (v !== 'grid') select(null);
         if (state.model) renderPreview();
     }
 
@@ -474,8 +500,16 @@
         try {
             const ids = [];
             for (const f of list) ids.push(await Images.add(f));
-            insertBlock(ids.map((id) => `![](${id})`).join('\n'));
-            toast('图片已插入，可以在 ![ ] 的方括号里写图片说明');
+            // 一次插入好几张竖图时，两张一组并排放，像 Word 里那样省地方
+            const tall = (id) => { const r = Images.cache.get(id); return r && r.h > r.w * 1.15; };
+            const lines = [];
+            for (let i = 0; i < ids.length; i++) {
+                if (tall(ids[i]) && tall(ids[i + 1])) { lines.push(`![](${ids[i]}) ![](${ids[i + 1]})`); i++; } else lines.push(`![](${ids[i]})`);
+            }
+            insertBlock(lines.join('\n'));
+            toast(lines.some((l) => l.includes(') !['))
+                ? '竖图已经两张一组并排放好了。点预览里的图片可以调大小、对齐或拆开'
+                : '图片已插入。点预览里的图片可以拖动调大小');
         } catch (e) {
             console.error(e);
             toast('图片插入失败，换一张试试？');
@@ -542,7 +576,7 @@
     const saveNow = () => {
         if (!state.model) return;
         const title = draftTitle();
-        const ok = Store.drafts.save(state.draftId, { title, text: state.text, settings: state.settings });
+        const ok = Store.drafts.save(state.draftId, { title, text: state.text, settings: state.settings, stickers: state.stickers });
         Store.local.set('current', state.draftId);
         $('#saveState').textContent = ok ? '已自动保存' : '未能保存（浏览器存储不可用或已满）';
     };
@@ -557,6 +591,8 @@
         state.draftId = id;
         state.text = d.text || '';
         state.settings = mergeSettings(d.settings);
+        state.stickers = d.stickers || [];
+        state.sel = null;
         ed.value = state.text;
         syncSettingsUI();
         update();
@@ -567,6 +603,8 @@
         state.draftId = Store.drafts.newId();
         state.text = text;
         state.settings = mergeSettings({ ...state.settings, cover: { ...state.settings.cover, title: '', subtitle: '', badge: '' } });
+        state.stickers = [];
+        state.sel = null;
         ed.value = text;
         syncSettingsUI();
         update();
@@ -858,6 +896,412 @@
         }
     }
 
+    /* ================================================================ 贴纸 & 图片：在预览里直接摆弄 */
+
+    const pageSize = () => Render.size(state.settings.ratio);
+    const findSticker = (id) => state.stickers.find((st) => st.id === id);
+    const zoomK = () => state.zoom / pageSize()[0];
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+    function select(sel) {
+        state.sel = sel;
+        decorate();
+    }
+
+    /** 给选中的对象加上选中框和拖动手柄，并摆好浮动工具条 */
+    function decorate() {
+        $$('#grid .obj-h').forEach((h) => h.remove());
+        $$('#grid .sel-obj').forEach((el) => el.classList.remove('sel-obj'));
+        const el = selectedEl();
+        if (!el) {
+            if (state.sel && state.view === 'grid') state.sel = null;
+            $('#objBar').hidden = true;
+            return;
+        }
+        el.classList.add('sel-obj');
+        if (state.sel.kind === 'stk') {
+            el.insertAdjacentHTML('beforeend', '<i class="obj-h h-rot" data-h="rot" title="旋转"></i><i class="obj-h h-size" data-h="size" title="缩放"></i>');
+        } else if (!el.closest('.row')) {
+            const fig = el.closest('.fig');
+            fig.insertAdjacentHTML('beforeend', `<i class="obj-h h-img${fig.classList.contains('al-right') ? ' left' : ''}" data-h="img" title="拖动调整大小"></i>`);
+            placeImgHandle(el);
+        }
+        renderBar();
+        placeBar();
+    }
+
+    function selectedEl() {
+        const sel = state.sel;
+        if (!sel || state.view !== 'grid') return null;
+        if (sel.kind === 'stk') return $(`#grid .stk[data-sid="${CSS.escape(sel.id)}"]`);
+        return $(`#grid .fig[data-line="${sel.line}"] img[data-i="${sel.i}"]`);
+    }
+
+    function placeImgHandle(img) {
+        const h = img.parentElement.querySelector('.h-img');
+        if (!h) return;
+        const left = h.classList.contains('left');
+        h.style.left = (img.offsetLeft + (left ? 0 : img.offsetWidth)) + 'px';
+        h.style.top = (img.offsetTop + img.offsetHeight) + 'px';
+    }
+
+    const ICON = {
+        up: '<svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg>',
+        down: '<svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></svg>',
+        copy: '<svg class="i" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>',
+        del: '<svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>',
+        left: '<svg class="i" viewBox="0 0 24 24"><path d="M4 5h16M4 10h10M4 15h16M4 20h10"/></svg>',
+        center: '<svg class="i" viewBox="0 0 24 24"><path d="M4 5h16M7 10h10M4 15h16M7 20h10"/></svg>',
+        right: '<svg class="i" viewBox="0 0 24 24"><path d="M4 5h16M10 10h10M4 15h16M10 20h10"/></svg>',
+    };
+
+    function renderBar() {
+        const bar = $('#objBar');
+        const sel = state.sel;
+        let html = '';
+        if (sel.kind === 'stk') {
+            const st = findSticker(sel.id);
+            const i = state.stickers.indexOf(st);
+            const isImg = st.kind === 'img';
+            html += `<button data-act="up" title="上移一层"${i === state.stickers.length - 1 ? ' disabled' : ''}>${ICON.up}上移</button>`;
+            html += `<button data-act="down" title="下移一层"${i === 0 ? ' disabled' : ''}>${ICON.down}下移</button><span class="sep"></span>`;
+            if (isImg) {
+                html += `<select data-act="shape" title="形状">${Stickers.SHAPES.map(([v, n]) => `<option value="${v}"${(st.shape || 'none') === v ? ' selected' : ''}>${n}</option>`).join('')}</select>`;
+                html += `<button data-act="cut" class="${st.cut ? 'on' : ''}" title="自动去掉背景">抠图</button>`;
+                if (st.cut) html += `<label class="cut-range" title="抠得不干净就往右拖，抠过头了就往左拖"><input type="range" data-act="strength" min="1" max="100" value="${st.cut}"></label>`;
+            }
+            html += `<button data-act="outline" class="${st.outline ? 'on' : ''}" title="像真贴纸一样描一圈白边">白边</button>`;
+            html += `<button data-act="shadow" class="${st.shadow ? 'on' : ''}" title="投影">阴影</button><span class="sep"></span>`;
+            html += `<button data-act="dup" title="复制一个">${ICON.copy}</button><button data-act="del" title="删除 (Delete)">${ICON.del}</button>`;
+        } else {
+            const line = ed.value.split('\n')[sel.line] || '';
+            const items = Markdown.imageLine(line) || [];
+            const it = items[sel.i] || {};
+            if (items.length > 1) {
+                html += `<button data-act="swapL"${sel.i === 0 ? ' disabled' : ''} title="和左边那张换位置">← 左移</button>`;
+                html += `<button data-act="swapR"${sel.i === items.length - 1 ? ' disabled' : ''} title="和右边那张换位置">右移 →</button><span class="sep"></span>`;
+                html += '<button data-act="split" title="每张图单独占一行">拆开</button>';
+            } else {
+                const al = it.align || 'center';
+                html += ['left', 'center', 'right'].map((a) => `<button data-act="align" data-v="${a}" class="${al === a ? 'on' : ''}" title="${{ left: '靠左', center: '居中', right: '靠右' }[a]}">${ICON[a]}</button>`).join('');
+                html += `<span class="sep"></span><span class="pct" id="imgPct">${it.width || 100}%</span>`;
+                html += `<button data-act="full" title="恢复满宽">满宽</button>`;
+                if (prevImageLine(sel.line) >= 0) html += '<span class="sep"></span><button data-act="merge" title="和上一张图并排放在同一行">和上一张并排</button>';
+            }
+        }
+        bar.innerHTML = html;
+        bar.hidden = false;
+    }
+
+    function placeBar() {
+        const bar = $('#objBar');
+        const el = selectedEl();
+        if (!el || bar.hidden) return;
+        const r = el.getBoundingClientRect();
+        const g = $('#grid').getBoundingClientRect();
+        const bw = bar.offsetWidth;
+        const bh = bar.offsetHeight;
+        let top = r.top - bh - 14;
+        if (top < g.top + 4) top = Math.min(r.bottom + 14, window.innerHeight - bh - 8);
+        bar.style.left = clamp(r.left + r.width / 2 - bw / 2, 8, window.innerWidth - bw - 8) + 'px';
+        bar.style.top = top + 'px';
+        const outside = r.bottom < g.top || r.top > g.bottom;
+        bar.style.visibility = outside ? 'hidden' : '';
+    }
+
+    function commitStickers() {
+        save();
+        renderGrid();
+    }
+
+    /* ---------------- 贴纸：添加 / 删除 / 抠图 ---------------- */
+
+    function addSticker(props) {
+        const [pw, ph] = pageSize();
+        const page = state.selected;
+        // 同一页上连续加的贴纸错开一点，免得叠在一起
+        const n = state.stickers.filter((st) => st.page === page).length;
+        const st = {
+            id: Store.drafts.newId(),
+            page,
+            x: pw / 2 + (n % 4) * 60 - 90,
+            y: ph * 0.42 + (n % 4) * 60 - 90,
+            w: props.kind === 'emoji' ? 180 : 360,
+            rot: 0,
+            shape: 'none',
+            outline: false,
+            shadow: false,
+            ...props,
+        };
+        state.stickers.push(st);
+        state.sel = { kind: 'stk', id: st.id };
+        commitStickers();
+        return st;
+    }
+
+    function removeSticker(id) {
+        const st = findSticker(id);
+        if (!st) return;
+        state.stickers = state.stickers.filter((x) => x !== st);
+        // 没有其它贴纸再用到的图片，从存储里删掉
+        const used = new Set(state.stickers.flatMap((x) => [x.src, x.orig]));
+        [st.src, st.orig].filter((k) => k && !used.has(k)).forEach((k) => Store.assets.remove(k));
+        state.sel = null;
+        commitStickers();
+    }
+
+    async function addStickerImages(files) {
+        const list = [...files].filter((f) => f.type.startsWith('image/'));
+        const cut = $('#autoCut').checked;
+        for (const f of list) {
+            toast('正在添加贴纸…', 0);
+            try {
+                const id = await Images.add(f, { png: true });
+                const st = addSticker({ kind: 'img', src: id, orig: id, cut: 0 });
+                if (cut) await cutSticker(st, 50, true);
+                else toast('贴纸已添加，拖动它摆到喜欢的位置');
+            } catch (e) {
+                console.error(e);
+                toast('这张图片读取失败了，换一张试试？');
+            }
+        }
+    }
+
+    /** 抠图。strength 为 0 表示恢复原图 */
+    async function cutSticker(st, strength, auto) {
+        const old = st.src;
+        if (!strength) {
+            st.src = st.orig;
+            st.cut = 0;
+        } else {
+            toast('正在抠图…', 0);
+            const orig = Images.cache.get(st.orig) || await Images.load(st.orig);
+            if (!orig) { toast('找不到原图了'); return; }
+            const res = await Stickers.cutout(orig.url, strength);
+            if (res.removed < 0.01 || res.removed > 0.98) {
+                if (auto) toast('贴纸已添加。这张图没找到明显的纯色背景，保留了原图');
+                else toast(res.removed > 0.98 ? '抠过头了，整张图都被去掉了，把强度往左调一调' : '没找到明显的纯色背景。自动抠图适合白底、纯色底的图');
+                if (auto || res.removed > 0.98) { renderBar(); return; }
+            }
+            st.src = await Images.put({ url: res.url, w: res.w, h: res.h });
+            st.cut = strength;
+            if (!auto || res.removed >= 0.01) toast('抠好了！不满意可以拖工具条上的滑块调强度');
+        }
+        if (old !== st.orig && old !== st.src) Store.assets.remove(old);
+        commitStickers();
+    }
+
+    /* ---------------- 图片：改写 Markdown ---------------- */
+
+    /** 把第 from 行到第 to 行（不含）替换成 text */
+    function setLines(from, to, text) {
+        const lines = ed.value.split('\n');
+        const start = lines.slice(0, from).reduce((n, l) => n + l.length + 1, 0);
+        const end = start + lines.slice(from, to).join('\n').length;
+        ed.setRangeText(text, start, end, 'preserve');
+        onInput();
+    }
+
+    function prevImageLine(line) {
+        const lines = ed.value.split('\n');
+        let p = line - 1;
+        while (p >= 0 && !lines[p].trim()) p--;
+        return p >= 0 && Markdown.imageLine(lines[p]) ? p : -1;
+    }
+
+    function editImage(act, v) {
+        const sel = state.sel;
+        const lines = ed.value.split('\n');
+        const items = Markdown.imageLine(lines[sel.line] || '');
+        if (!items) return;
+        const it = items[sel.i];
+        if (act === 'align') it.align = v === 'center' ? null : v;
+        if (act === 'width') it.width = v >= 100 ? null : v;
+        if (act === 'full') { it.width = null; }
+        if (act === 'swapL' || act === 'swapR') {
+            const j = sel.i + (act === 'swapL' ? -1 : 1);
+            [items[sel.i], items[j]] = [items[j], items[sel.i]];
+            state.sel = { ...sel, i: j };
+        }
+        if (act === 'split') {
+            setLines(sel.line, sel.line + 1, items.map((x) => Markdown.formatImages([{ ...x, width: null, align: null }])).join('\n'));
+            state.sel = { kind: 'img', line: sel.line + sel.i, i: 0 };
+            return;
+        }
+        if (act === 'merge') {
+            const p = prevImageLine(sel.line);
+            const prev = Markdown.imageLine(lines[p]);
+            const merged = [...prev, ...items].map((x) => ({ ...x, width: null, align: null }));
+            setLines(p, sel.line + 1, Markdown.formatImages(merged));
+            state.sel = { kind: 'img', line: p, i: prev.length };
+            return;
+        }
+        setLines(sel.line, sel.line + 1, Markdown.formatImages(items));
+    }
+
+    /* ---------------- 拖动 ---------------- */
+
+    function drag(e, onMove, onEnd) {
+        e.preventDefault();
+        const x0 = e.clientX;
+        const y0 = e.clientY;
+        let moved = false;
+        const move = (ev) => {
+            if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 3) return;
+            moved = true;
+            onMove(ev, ev.clientX - x0, ev.clientY - y0);
+        };
+        const up = () => {
+            window.removeEventListener('pointermove', move);
+            window.removeEventListener('pointerup', up);
+            window.removeEventListener('pointercancel', up);
+            document.body.classList.remove('dragging');
+            onEnd(moved);
+        };
+        document.body.classList.add('dragging');
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
+        window.addEventListener('pointercancel', up);
+    }
+
+    function place(el, st) {
+        const [pw, ph] = pageSize();
+        const x = clamp(st.x, 0, pw);
+        const y = clamp(st.y, 0, ph);
+        el.style.width = st.w + 'px';
+        el.style.transform = `translate(${x - st.w / 2}px, ${y}px) translateY(-50%) rotate(${st.rot || 0}deg)`;
+        const em = el.querySelector('.emoji');
+        if (em) { em.style.fontSize = (st.w * 0.86).toFixed(1) + 'px'; em.style.lineHeight = st.w + 'px'; }
+    }
+
+    /** 拖动贴纸；拖到别的页面上时，贴纸就跟着换到那一页 */
+    function moveSticker(e, el) {
+        const st = findSticker(el.dataset.sid);
+        const [pw, ph] = pageSize();
+        const k = zoomK();
+        let frame = el.closest('.thumb-frame');
+        const r0 = frame.getBoundingClientRect();
+        const offX = (e.clientX - r0.left) / k - st.x;
+        const offY = (e.clientY - r0.top) / k - st.y;
+        drag(e, (ev) => {
+            const under = document.elementsFromPoint(ev.clientX, ev.clientY).find((n) => n.matches('#grid .thumb-frame'));
+            if (under && under !== frame) {
+                frame = under;
+                const pg = frame.querySelector('.pg');
+                let lay = pg.querySelector('.pg-stk');
+                if (!lay) { lay = document.createElement('div'); lay.className = 'pg-stk'; pg.appendChild(lay); }
+                lay.appendChild(el);
+                st.page = Number(frame.closest('.thumb').dataset.i);
+            }
+            const r = frame.getBoundingClientRect();
+            st.x = clamp((ev.clientX - r.left) / k - offX, 0, pw);
+            st.y = clamp((ev.clientY - r.top) / k - offY, 0, ph);
+            place(el, st);
+            placeBar();
+        }, (moved) => {
+            if (!moved) return;
+            state.selected = Math.min(st.page, state.model.total - 1);
+            commitStickers();
+        });
+    }
+
+    function resizeSticker(e, el, mode) {
+        const st = findSticker(el.dataset.sid);
+        const r = el.getBoundingClientRect();
+        const cx = r.left + r.width / 2;
+        const cy = r.top + r.height / 2;
+        const w0 = st.w;
+        const d0 = Math.hypot(e.clientX - cx, e.clientY - cy) || 1;
+        drag(e, (ev) => {
+            if (mode === 'size') {
+                st.w = Math.round(clamp(w0 * Math.hypot(ev.clientX - cx, ev.clientY - cy) / d0, 40, pageSize()[0] * 1.5));
+            } else {
+                let a = Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180 / Math.PI + 90;
+                a = ((a + 540) % 360) - 180;
+                const snap = Math.round(a / 45) * 45;
+                st.rot = Math.abs(a - snap) < 4 ? snap : Math.round(a);
+            }
+            place(el, st);
+            placeBar();
+        }, (moved) => { if (moved) commitStickers(); });
+    }
+
+    /** 拖图片右下角的圆点调整宽度（等比例），松手后写回 Markdown 里的 {xx%} */
+    function resizeImage(e, h) {
+        const fig = h.closest('.fig');
+        const img = fig.querySelector('img.sel-obj');
+        const k = zoomK();
+        const bw = fig.clientWidth;
+        const w0 = img.offsetWidth;
+        const sign = h.classList.contains('left') ? -1 : 1;
+        const factor = fig.classList.contains('al-left') || fig.classList.contains('al-right') ? 1 : 2;
+        const base = img.style.width;
+        let pct = null;
+        drag(e, (ev, dx) => {
+            pct = Math.round(clamp((w0 + sign * factor * dx / k) / bw * 100, 10, 100));
+            img.style.width = base.replace(/^min\(\d+%/, `min(${pct}%`);
+            placeImgHandle(img);
+            const out = $('#imgPct');
+            if (out) out.textContent = pct + '%';
+            placeBar();
+        }, (moved) => { if (moved && pct) editImage('width', pct); });
+    }
+
+    function onGridPointerDown(e) {
+        if (e.button > 0 || state.view !== 'grid') return;
+        const h = e.target.closest('[data-h]');
+        const stk = e.target.closest('.stk');
+        const img = e.target.closest('.fig img');
+        if (h && h.dataset.h === 'img') { resizeImage(e, h); return; }
+        if (h) { resizeSticker(e, h.closest('.stk'), h.dataset.h); return; }
+        if (stk) {
+            if (state.sel?.id !== stk.dataset.sid) select({ kind: 'stk', id: stk.dataset.sid });
+            moveSticker(e, stk);
+            return;
+        }
+        if (img) {
+            const fig = img.closest('.fig');
+            select({ kind: 'img', line: Number(fig.dataset.line), i: Number(img.dataset.i) });
+            return;
+        }
+        if (state.sel) select(null);
+    }
+
+    function onBarAction(e) {
+        const b = e.target.closest('[data-act]');
+        if (!b || b.disabled) return;
+        const act = b.dataset.act;
+        if (e.type === 'click' && (b.tagName === 'SELECT' || b.tagName === 'INPUT')) return;
+        const sel = state.sel;
+        if (!sel) return;
+        if (sel.kind === 'img') { editImage(act, b.dataset.v); return; }
+        const st = findSticker(sel.id);
+        const i = state.stickers.indexOf(st);
+        switch (act) {
+            case 'up':
+            case 'down': {
+                const j = i + (act === 'up' ? 1 : -1);
+                if (j < 0 || j >= state.stickers.length) return;
+                [state.stickers[i], state.stickers[j]] = [state.stickers[j], state.stickers[i]];
+                commitStickers();
+                toast(act === 'up' ? '上移了一层' : '下移了一层', 1200);
+                break;
+            }
+            case 'shape': st.shape = b.value; commitStickers(); break;
+            case 'outline': st.outline = !st.outline; commitStickers(); break;
+            case 'shadow': st.shadow = !st.shadow; commitStickers(); break;
+            case 'cut': cutSticker(st, st.cut ? 0 : 50); break;
+            case 'strength': cutSticker(st, Number(b.value)); break;
+            case 'dup': {
+                const { id, ...rest } = st;
+                addSticker({ ...rest, x: st.x + 50, y: st.y + 50 });
+                break;
+            }
+            case 'del': removeSticker(st.id); break;
+            default: break;
+        }
+    }
+
     /* ================================================================ 外观 & 布局 */
 
     function applyDark() {
@@ -934,7 +1378,21 @@
             markThumbs();
             if (dl) runExport('current');
         });
+        $('#grid').addEventListener('pointerdown', onGridPointerDown);
+        $('#grid').addEventListener('scroll', placeBar, { passive: true });
+        window.addEventListener('resize', placeBar);
+        $('#objBar').addEventListener('click', onBarAction);
+        $('#objBar').addEventListener('change', onBarAction);
+        $('#stickerBtn').addEventListener('click', () => toggleMenu($('#stickerMenu')));
+        $('#emojiGrid').innerHTML = Stickers.EMOJIS.map((em) => `<button data-emoji="${em}">${em}</button>`).join('');
+        $('#stickerMenu').addEventListener('click', (e) => {
+            const em = e.target.closest('[data-emoji]');
+            if (em) { addSticker({ kind: 'emoji', text: em.dataset.emoji }); toast('拖动贴纸摆到喜欢的位置', 1600); }
+            if (e.target.closest('[data-act="upload"]')) { toggleMenu($('#stickerMenu'), false); $('#stickerInput').click(); }
+        });
+        $('#stickerInput').addEventListener('change', (e) => { addStickerImages(e.target.files); e.target.value = ''; });
         $('#grid').addEventListener('dblclick', (e) => {
+            if (e.target.closest('.stk, .fig img, .obj-h')) return;
             const t = e.target.closest('.thumb');
             if (t) jumpToPage(Number(t.dataset.i));
         });
@@ -1003,6 +1461,24 @@
             if (!e.target.closest('.dropdown')) $$('.menu').forEach((m) => { m.hidden = true; });
         });
         document.addEventListener('keydown', (e) => {
+            const typing = e.target.closest('input, textarea, select, [contenteditable]');
+            if (state.sel && !typing) {
+                if (state.sel.kind === 'stk' && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); removeSticker(state.sel.id); return; }
+                const arrows = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+                if (state.sel.kind === 'stk' && arrows[e.key]) {
+                    e.preventDefault();
+                    const st = findSticker(state.sel.id);
+                    const step = e.shiftKey ? 40 : 6;
+                    st.x += arrows[e.key][0] * step;
+                    st.y += arrows[e.key][1] * step;
+                    const el = selectedEl();
+                    if (el) place(el, st);
+                    placeBar();
+                    save();
+                    return;
+                }
+                if (e.key === 'Escape') { select(null); return; }
+            }
             if (e.key === 'Escape') {
                 $$('.menu').forEach((m) => { m.hidden = true; });
                 setSettingsDrawer(false);
@@ -1032,6 +1508,7 @@
             state.draftId = lastId;
             state.text = draft.text || '';
             state.settings = mergeSettings(draft.settings);
+            state.stickers = draft.stickers || [];
         } else {
             state.draftId = Store.drafts.newId();
             state.text = SAMPLE;
@@ -1061,6 +1538,9 @@
             return update();
         },
         exportPage: (i, scale = 1) => Exporter.toBlob(buildPage(i), scale),
+        addSticker,
+        select,
+        cutout: Stickers.cutout,
         SAMPLE,
     };
     window.Studio.ready = init();

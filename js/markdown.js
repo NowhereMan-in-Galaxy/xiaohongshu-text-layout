@@ -142,6 +142,43 @@
         return out;
     }
 
+    /* ---------------------------------------------------------------- 图片行
+     * 一行里只有图片时，这一行就是图片块：
+     *   ![说明](地址)                  一张图，撑满宽度
+     *   ![说明](地址){60%}             宽度 60%，等比例缩放
+     *   ![说明](地址){40% left}        宽度 40%，靠左（left / center / right）
+     *   ![](a) ![](b)                  同一行写多张：并排显示，高度自动对齐（适合竖图）
+     */
+    const IMG_ITEM = /!\[([^\]]*)\]\(([^)\s]+)\)(?:\{([^}]*)\})?/g;
+    const ALIGNS = { left: 'left', right: 'right', center: 'center', 左: 'left', 右: 'right', 中: 'center' };
+
+    function imageLine(line) {
+        if (!RE.image.test(line)) return null;
+        const items = [];
+        for (const m of line.matchAll(IMG_ITEM)) {
+            const src = safeImageSrc(m[2]);
+            if (!src) return null;
+            const opt = m[3] || '';
+            const w = /(\d{1,3})\s*%/.exec(opt);
+            const a = /(left|right|center|左|右|中)/i.exec(opt);
+            items.push({
+                src,
+                alt: m[1],
+                width: w ? Math.min(100, Math.max(10, Number(w[1]))) : null,
+                align: a ? ALIGNS[a[1].toLowerCase()] : null,
+            });
+        }
+        return items.length ? items : null;
+    }
+
+    /** imageLine 的反向操作：把图片信息写回成一行 Markdown */
+    function formatImages(items) {
+        return items.map((it) => {
+            const opt = [it.width && it.width < 100 ? it.width + '%' : '', it.align && it.align !== 'center' ? it.align : ''].filter(Boolean).join(' ');
+            return `![${it.alt || ''}](${it.src})${opt ? `{${opt}}` : ''}`;
+        }).join(' ');
+    }
+
     /* ---------------------------------------------------------------- 块级语法 */
 
     const RE = {
@@ -153,7 +190,7 @@
         quote: /^\s*>\s?(.*)$/,
         list: /^(\s*)([-*+•·]|\d{1,3}[.)、])\s+(.*)$/,
         task: /^\[([ xX])\]\s+(.*)$/,
-        image: /^\s*!\[([^\]]*)\]\(([^)\s]+)\)\s*$/,
+        image: /^\s*(?:!\[[^\]]*\]\([^)\s]+\)(?:\{[^}]*\})?\s*)+$/,
         tableSep: /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/,
     };
 
@@ -270,14 +307,12 @@
                 continue;
             }
 
-            const img = RE.image.exec(line);
-            if (img) {
-                const src = safeImageSrc(img[2]);
-                if (src) {
-                    push({ type: 'img', src, alt: img[1], html: escapeHtml(img[1]), text: '', line: at });
-                    i++;
-                    continue;
-                }
+            const items = imageLine(line);
+            if (items) {
+                if (items.length === 1) push({ type: 'img', ...items[0], html: escapeHtml(items[0].alt), text: '', line: at });
+                else push({ type: 'imgrow', items, text: '', line: at });
+                i++;
+                continue;
             }
 
             const html = parseInline(line.trim());
@@ -291,7 +326,7 @@
             blocks,
             title: first ? first.text : '',
             titleHtml: first ? first.html : '',
-            stats: { chars, images: blocks.filter((b) => b.type === 'img').length },
+            stats: { chars, images: blocks.reduce((n, b) => n + (b.type === 'img' ? 1 : b.type === 'imgrow' ? b.items.length : 0), 0) },
         };
     }
 
@@ -321,5 +356,5 @@
         return j > 0 ? j : k;
     }
 
-    return { parse, parseInline, escapeHtml, toPlain, safeImageSrc, adjustBreak };
+    return { parse, parseInline, escapeHtml, toPlain, safeImageSrc, adjustBreak, imageLine, formatImages };
 });
