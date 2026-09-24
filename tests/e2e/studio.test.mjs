@@ -28,7 +28,9 @@ before(async () => {
     });
     await new Promise((r) => server.listen(0, r));
     base = `http://localhost:${server.address().port}/`;
-    browser = await chromium.launch();
+    // 关掉 LCD 亚像素抗锯齿：屏幕上的字边缘会带彩色镶边，而导出的图片用的是灰度抗锯齿（这对图片才是正确的），
+    // 不关掉的话「逐像素对比」测试比较的就不是同一种渲染方式
+    browser = await chromium.launch({ args: ['--disable-lcd-text'] });
 });
 
 function send(file, res) {
