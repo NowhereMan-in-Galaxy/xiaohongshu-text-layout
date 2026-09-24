@@ -155,7 +155,6 @@
                             <button data-act="paste">
                                 <svg class="i" viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h4"/></svg>粘贴图片做贴纸
                             </button>
-                            <label class="check"><input type="checkbox" id="autoCut" checked> 自动抠图（智能识别主体，图片不会上传）</label>
                             <div class="label tip">💡 iPhone / Mac：在「照片」里长按主体选「拷贝」，再回来点「粘贴图片做贴纸」，就能直接用苹果抠好的图。<br>拖动贴纸摆位置，拖到别的页面上就换页；拖右下角缩放、拖顶上的圆点旋转。</div>
                         </div>
                     </div>
@@ -334,6 +333,26 @@
                 <tr><td>多按几次回车</td><td>每多一个空行，多一行留白</td></tr>
             </table>
             <button class="btn primary" value="close">知道了</button>
+        </form>
+    </dialog>
+
+    <dialog id="cropDialog" class="dialog crop-dialog">
+        <form method="dialog">
+            <h2>框出想要的部分</h2>
+            <p class="crop-tip">拖四个角调整，或者在图上直接拖出一个新框。<b>框得越贴近主体，自动抠图越准。</b></p>
+            <div class="crop-wrap">
+                <div class="crop-stage" id="cropStage">
+                    <img id="cropImg" alt="" draggable="false">
+                    <div class="crop-box" id="cropBox"><i data-c="nw"></i><i data-c="ne"></i><i data-c="sw"></i><i data-c="se"></i></div>
+                </div>
+            </div>
+            <label class="crop-cut"><input type="checkbox" id="cropCut"> 自动抠图（智能识别主体，图片不会上传）</label>
+            <div class="crop-actions">
+                <button class="btn" id="cropAll" type="button">全选</button>
+                <span class="grow"></span>
+                <button class="btn" value="cancel">取消</button>
+                <button class="btn primary" value="ok">确定</button>
+            </div>
         </form>
     </dialog>
 

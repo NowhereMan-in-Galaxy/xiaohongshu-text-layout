@@ -368,10 +368,35 @@ test('贴纸：添加、拖动、拖到别的页、调图层，导出和屏幕�
         input.files = dt.files;
         input.dispatchEvent(new Event('change'));
     }, photo);
+    // 上传后先弹出裁剪框：在图上拖出一个新框，只保留中间部分
+    await page.locator('#cropDialog[open]').waitFor();
+    const stage = await page.locator('#cropStage').boundingBox();
+    await page.mouse.move(stage.x + stage.width * 0.1, stage.y + stage.height * 0.1);
+    await page.mouse.down();
+    await page.mouse.move(stage.x + stage.width * 0.9, stage.y + stage.height * 0.9, { steps: 5 });
+    await page.mouse.up();
+    assert.equal(await page.locator('#cropCut').isChecked(), true, '默认勾选自动抠图');
+    await page.locator('#cropDialog button[value="ok"]').click();
     await page.waitForFunction(() => Studio.state.stickers.length === 2 && Studio.state.stickers[1].cut > 0);
     let sts = await page.evaluate(() => Studio.state.stickers);
     assert.equal(sts[0].page, 1);
     assert.notEqual(sts[1].src, sts[1].orig, '上传的图片应该自动抠图');
+    assert.ok(Math.abs(sts[1].crop.x - 0.1) < 0.02 && Math.abs(sts[1].crop.w - 0.8) < 0.02, `裁剪范围 ${JSON.stringify(sts[1].crop)}`);
+    const dims = await page.evaluate((st) => Studio.imageSize(st.orig), sts[1]);
+    assert.ok(Math.abs(dims.w - 320) <= 2 && Math.abs(dims.h - 240) <= 2, `裁剪后的图应该是原图中间 80%：${dims.w}×${dims.h}`);
+
+    // 取消裁剪框不会添加贴纸
+    await page.evaluate(async (url) => {
+        const dt = new DataTransfer();
+        dt.items.add(new File([await (await fetch(url)).blob()], 'p.png', { type: 'image/png' }));
+        const input = document.getElementById('stickerInput');
+        input.files = dt.files;
+        input.dispatchEvent(new Event('change'));
+    }, photo);
+    await page.locator('#cropDialog[open]').waitFor();
+    await page.locator('#cropDialog button[value="cancel"]').click();
+    await page.waitForTimeout(200);
+    assert.equal(await page.evaluate(() => Studio.state.stickers.length), 2);
 
     // 图层：选中后面那张（在上层），下移一层
     await page.locator(`#grid .stk[data-sid="${sts[1].id}"]`).click();

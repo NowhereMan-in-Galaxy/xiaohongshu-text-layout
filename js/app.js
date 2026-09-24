@@ -967,6 +967,7 @@
             html += `<button data-act="up" title="上移一层"${i === state.stickers.length - 1 ? ' disabled' : ''}>${ICON.up}上移</button>`;
             html += `<button data-act="down" title="下移一层"${i === 0 ? ' disabled' : ''}>${ICON.down}下移</button><span class="sep"></span>`;
             if (isImg) {
+                html += `<button data-act="crop" title="重新框选想要的部分">裁剪</button>`;
                 html += `<select data-act="shape" title="形状">${Stickers.SHAPES.map(([v, n]) => `<option value="${v}"${(st.shape || 'none') === v ? ' selected' : ''}>${n}</option>`).join('')}</select>`;
                 html += `<button data-act="cut" class="${st.cut ? 'on' : ''}" title="自动去掉背景">抠图</button>`;
                 if (st.cut) {
@@ -1048,11 +1049,136 @@
         const st = findSticker(id);
         if (!st) return;
         state.stickers = state.stickers.filter((x) => x !== st);
-        // 没有其它贴纸再用到的图片，从存储里删掉
-        const used = new Set(state.stickers.flatMap((x) => [x.src, x.orig]));
-        [st.src, st.orig].filter((k) => k && !used.has(k)).forEach((k) => Store.assets.remove(k));
+        dropUnused([st.src, st.orig, st.full]);
         state.sel = null;
         commitStickers();
+    }
+
+    /** 没有任何贴纸再用到的图片，从存储里删掉 */
+    function dropUnused(ids) {
+        const used = new Set(state.stickers.flatMap((x) => [x.src, x.orig, x.full]));
+        [...new Set(ids)].filter((k) => k && !used.has(k)).forEach((k) => Store.assets.remove(k));
+    }
+
+    /* ---------------- 裁剪框：上传图片时先框出想要的部分 ---------------- */
+
+    const FULL = { x: 0, y: 0, w: 1, h: 1 };
+    const isFull = (r) => r.x < 0.005 && r.y < 0.005 && r.w > 0.99 && r.h > 0.99;
+
+    /**
+     * 打开裁剪框。返回 { rect, cut }（rect 是相对原图的比例），取消返回 null
+     * 框得越贴近主体，智能抠图越准：框外的杂乱背景根本不会参与识别
+     */
+    function openCrop(url, init, cut) {
+        const dlg = $('#cropDialog');
+        const stage = $('#cropStage');
+        const box = $('#cropBox');
+        let r = { ...(init || FULL) };
+        const draw = () => {
+            box.style.left = r.x * 100 + '%';
+            box.style.top = r.y * 100 + '%';
+            box.style.width = r.w * 100 + '%';
+            box.style.height = r.h * 100 + '%';
+        };
+        $('#cropImg').src = url;
+        $('#cropCut').checked = cut;
+        draw();
+
+        const onDown = (e) => {
+            if (e.button > 0) return;
+            e.preventDefault();
+            const rect = stage.getBoundingClientRect();
+            const px = (ev) => Math.min(1, Math.max(0, (ev.clientX - rect.left) / rect.width));
+            const py = (ev) => Math.min(1, Math.max(0, (ev.clientY - rect.top) / rect.height));
+            const corner = e.target.dataset.c;
+            const start = { ...r, px: px(e), py: py(e) };
+            // 框是整张图的时候，在图上拖就是画新框；否则在框里拖是移动框
+            const inside = e.target === box && !isFull(r);
+            const MIN = 0.04;
+            const move = (ev) => {
+                const x = px(ev);
+                const y = py(ev);
+                if (corner) {
+                    // 拖角：对角固定
+                    const fx = corner.includes('w') ? start.x + start.w : start.x;
+                    const fy = corner.includes('n') ? start.y + start.h : start.y;
+                    const nx = corner.includes('w') ? Math.min(x, fx - MIN) : Math.max(x, fx + MIN);
+                    const ny = corner.includes('n') ? Math.min(y, fy - MIN) : Math.max(y, fy + MIN);
+                    r = { x: Math.max(0, Math.min(fx, nx)), y: Math.max(0, Math.min(fy, ny)), w: Math.abs(nx - fx), h: Math.abs(ny - fy) };
+                    r.w = Math.min(r.w, 1 - r.x);
+                    r.h = Math.min(r.h, 1 - r.y);
+                } else if (inside) {
+                    // 拖框：整体平移
+                    r.x = Math.min(1 - r.w, Math.max(0, start.x + x - start.px));
+                    r.y = Math.min(1 - r.h, Math.max(0, start.y + y - start.py));
+                } else {
+                    // 在框外拖：画一个新框
+                    r = { x: Math.min(x, start.px), y: Math.min(y, start.py), w: Math.max(MIN, Math.abs(x - start.px)), h: Math.max(MIN, Math.abs(y - start.py)) };
+                    r.w = Math.min(r.w, 1 - r.x);
+                    r.h = Math.min(r.h, 1 - r.y);
+                }
+                draw();
+            };
+            const up = () => {
+                window.removeEventListener('pointermove', move);
+                window.removeEventListener('pointerup', up);
+                window.removeEventListener('pointercancel', up);
+            };
+            window.addEventListener('pointermove', move);
+            window.addEventListener('pointerup', up);
+            window.addEventListener('pointercancel', up);
+        };
+        const onReset = (e) => { e.preventDefault(); r = { ...FULL }; draw(); };
+
+        stage.addEventListener('pointerdown', onDown);
+        $('#cropAll').addEventListener('click', onReset);
+        dlg.returnValue = '';
+        dlg.showModal();
+        return new Promise((resolve) => {
+            dlg.addEventListener('close', () => {
+                stage.removeEventListener('pointerdown', onDown);
+                $('#cropAll').removeEventListener('click', onReset);
+                $('#cropImg').removeAttribute('src');
+                const cutNow = $('#cropCut').checked;
+                Store.local.set('auto-cut', cutNow);
+                resolve(dlg.returnValue === 'ok' ? { rect: r, cut: cutNow } : null);
+            }, { once: true });
+        });
+    }
+
+    /** 按比例裁出图片的一部分（保留透明背景） */
+    async function cropRec(rec, r) {
+        const img = new Image();
+        img.src = rec.url;
+        await img.decode();
+        const sx = Math.round(r.x * img.naturalWidth);
+        const sy = Math.round(r.y * img.naturalHeight);
+        const w = Math.max(1, Math.round(r.w * img.naturalWidth));
+        const h = Math.max(1, Math.round(r.h * img.naturalHeight));
+        const c = document.createElement('canvas');
+        c.width = w;
+        c.height = h;
+        c.getContext('2d').drawImage(img, sx, sy, w, h, 0, 0, w, h);
+        return { url: c.toDataURL('image/png'), w, h };
+    }
+
+    /** 给图片贴纸（重新）裁剪；cut 为 true 时裁完接着抠图 */
+    async function recropSticker(st) {
+        const fullId = st.full || st.orig;
+        const rec = Images.cache.get(fullId) || await Images.load(fullId);
+        if (!rec) { toast('找不到原图了'); return; }
+        const res = await openCrop(rec.url, st.crop, st.cut > 0 || Store.local.get('auto-cut', true));
+        if (!res) return;
+        const old = [st.src, st.orig];
+        st.full = fullId;
+        st.crop = isFull(res.rect) ? null : res.rect;
+        st.orig = st.crop ? await Images.put(await cropRec(rec, st.crop)) : fullId;
+        st.src = st.orig;
+        const strength = st.cut || 50;
+        st.cut = 0;
+        if (res.cut) await cutSticker(st, strength);
+        else commitStickers();
+        dropUnused(old);
     }
 
     async function addStickerImages(files) {
@@ -1060,14 +1186,22 @@
         if (!list.length) return;
         if (state.view !== 'grid') setView('grid');
         if (matchMedia('(max-width: 820px)').matches) setPane('preview');
-        const cut = $('#autoCut').checked;
         for (const f of list) {
-            toast('正在添加贴纸…', 0);
             try {
                 const id = await Images.add(f, { png: true });
-                const st = addSticker({ kind: 'img', src: id, orig: id, cut: 0 });
-                if (await Stickers.hasTransparency(Images.cache.get(id).url)) toast('这张图已经是透明背景了，直接用上（不用再抠）');
-                else if (cut) await cutSticker(st, 50, true);
+                const rec = Images.cache.get(id);
+                if (await Stickers.hasTransparency(rec.url)) {
+                    addSticker({ kind: 'img', src: id, orig: id, cut: 0 });
+                    toast('这张图已经是透明背景了，直接用上（不用再抠）');
+                    continue;
+                }
+                // 先让用户框出想要的部分，再抠图
+                const res = await openCrop(rec.url, null, Store.local.get('auto-cut', true));
+                if (!res) { Store.assets.remove(id); continue; }
+                const crop = isFull(res.rect) ? null : res.rect;
+                const orig = crop ? await Images.put(await cropRec(rec, crop)) : id;
+                const st = addSticker({ kind: 'img', src: orig, orig, full: id, crop, cut: 0 });
+                if (res.cut) await cutSticker(st, 50, true);
                 else toast('贴纸已添加，拖动它摆到喜欢的位置');
             } catch (e) {
                 console.error(e);
@@ -1114,8 +1248,8 @@
             st.cut = strength;
             if (res.removed >= 0.01) toast('抠好了！不满意可以拖工具条上的滑块调强度');
         }
-        if (old !== st.orig && old !== st.src) Store.assets.remove(old);
         commitStickers();
+        dropUnused([old]);
     }
 
     /* ---------------- 表情面板：像输入法的表情键盘一样左右滑 ---------------- */
@@ -1362,6 +1496,7 @@
             case 'cut': cutSticker(st, st.cut ? 0 : 50); break;
             case 'strength': cutSticker(st, Number(b.value)); break;
             case 'cutmode': st.cutMode = b.value; cutSticker(st, 50); break;
+            case 'crop': recropSticker(st); break;
             case 'dup': {
                 const { id, ...rest } = st;
                 addSticker({ ...rest, x: st.x + 50, y: st.y + 50 });
@@ -1630,6 +1765,7 @@
         select,
         cutout: Stickers.cutout,
         aiCutout: Stickers.aiCutout,
+        imageSize: (id) => { const r = Images.cache.get(id); return r && { w: r.w, h: r.h }; },
         SAMPLE,
     };
     window.Studio.ready = init();
