@@ -509,16 +509,6 @@
     white-space: nowrap;
 }
 
-.cv-sticker {
-    position: absolute;
-    right: -12px;
-    top: -30px;
-    font-size: 170px;
-    line-height: 1;
-    transform: rotate(12deg);
-    font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
-}
-
 /* ==================================================================
  * 主题
  * ================================================================== */
@@ -722,7 +712,6 @@
 }
 .theme-magazine .cv-title { font-weight: 900; line-height: 1.16; }
 .theme-magazine .cv-sub { font-style: italic; color: var(--ink); opacity: 0.75; }
-.theme-magazine .cv-sticker { top: 30px; }
 .theme-magazine .masthead {
     left: 100px;
     right: 100px;
@@ -945,7 +934,6 @@
 }
 .theme-candy .cv { align-items: center; text-align: center; }
 .theme-candy .cv-meta { bottom: -80px; }
-.theme-candy .cv-sticker { right: 10px; top: 0; }
 
 /* 8. 终端 —— 程序员风格，代码编辑器窗口 */
 .theme-terminal {

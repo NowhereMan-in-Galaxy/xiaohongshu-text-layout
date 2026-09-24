@@ -4,15 +4,27 @@
  * 贴纸不参与分页：它们记在「第几页」上，位置用页面像素表示（页面宽 1080）。
  * 列表里越靠后的贴纸越靠上层，「上移一层 / 下移一层」就是在列表里交换位置。
  *
- * 这里还有一个不依赖网络、不上传图片的「自动抠图」：
- * 从图片四条边出发，把和边缘颜色相近、并且连成一片的像素当成背景去掉。
- * 适合纯色或接近纯色背景的图（商品图、截图、白底照片、手绘扫描），复杂的街景照片抠不干净。
+ * 两种抠图，都在浏览器里完成，图片不会上传：
+ *  - 智能识别（aiCutout）：用一个小的 AI 模型找出图片里的主体，人像、宠物、物品、风景里的东西都行
+ *  - 纯色背景（cutout）：从四条边出发，去掉和边缘颜色相近、连成一片的像素。
+ *    不用下载任何东西，适合白底、纯色底的图；智能识别加载失败（比如没网）时也用它
  */
 const Stickers = (() => {
     const { escapeHtml: esc } = Markdown;
 
-    const EMOJIS = ['✨', '🔥', '💡', '📌', '❤️', '⭐️', '🌸', '🍀', '🎀', '🌙', '☀️', '🍓', '☕️', '📚', '✏️', '📍',
-        '✅', '❌', '‼️', '❓', '💯', '👍', '👀', '🎉', '😆', '🥹', '😭', '🤔', '🙌', '💪', '🐱', '🐶'];
+    // 表情库，分类和手机输入法的表情键盘差不多
+    const E = (str) => [...new Intl.Segmenter('zh', { granularity: 'grapheme' }).segment(str)].map((x) => x.segment).filter((x) => x.trim());
+    const EMOJI_CATS = [
+        ['笑脸', '😀', E('😀😃😄😁😆😅🤣😂🙂😉😊😇🥰😍🤩😘😋😛😜🤪😝🤗🤭🤫🤔😐😑😶😏😒🙄😬😌😔😪😴😷🤒🥵🥶🥴😵🤯🥳😎🤓🧐😕😟🙁😮😯😲😳🥺🥹😦😧😨😰😥😢😭😱😖😣😞😓😩😫🥱😤😡😠🤬😈👿💀💩🤡👻👽🤖😺😸😹😻😼😽🙀😿😾🙈🙉🙊')],
+        ['手势', '👍', E('👋🤚🖐️✋🖖👌🤌🤏✌️🤞🫰🤟🤘🤙👈👉👆👇☝️👍👎✊👊🤛🤜👏🙌🫶👐🤲🤝🙏✍️💅💪🧠👀👁️👅👄💋')],
+        ['爱心', '❤️', E('❤️🩷🧡💛💚💙🩵💜🤎🖤🩶🤍💔❣️💕💞💓💗💖💘💝💟💌')],
+        ['动物', '🐱', E('🐶🐱🐭🐹🐰🦊🐻🐼🐻‍❄️🐨🐯🦁🐮🐷🐸🐵🐔🐧🐦🐤🦆🦅🦉🦇🐺🐗🐴🦄🐝🐛🦋🐌🐞🐜🐢🐍🦎🐙🦑🦐🦀🐡🐠🐟🐬🐳🐋🦈🐊🐅🐆🦓🦒🐘🦛🐪🦘🐄🐎🐖🐑🦙🐐🦌🐕🐩🐈🐈‍⬛🐓🦃🦚🦜🦢🦩🕊️🐇🦝🦦🦥🐁🐿️🦔🐉')],
+        ['植物', '🌸', E('💐🌸💮🏵️🌹🥀🌺🌻🌼🌷🌱🪴🌲🌳🌴🌵🌾🌿☘️🍀🍁🍂🍃🍄🌰🪷🪻')],
+        ['食物', '🍓', E('🍇🍈🍉🍊🍋🍌🍍🥭🍎🍏🍐🍑🍒🍓🫐🥝🍅🥥🥑🍆🥔🥕🌽🌶️🥒🥬🥦🧄🧅🍞🥐🥖🥨🥯🥞🧇🧀🍖🍗🥩🥓🍔🍟🍕🌭🥪🌮🌯🥗🍝🍜🍲🍛🍣🍱🥟🍤🍙🍚🍘🍥🥮🍢🍡🍧🍨🍦🥧🧁🍰🎂🍮🍭🍬🍫🍿🍩🍪🥛☕️🍵🧋🥤🧃🍶🍺🍻🥂🍷🍸🍹')],
+        ['天气', '☀️', E('☀️🌤️⛅️🌥️☁️🌦️🌧️⛈️🌩️❄️☃️⛄️🌬️💨🌪️🌈☔️💧🌊🌙🌛🌜🌝🌞⭐️🌟✨💫☄️🔥🌍🪐')],
+        ['物品', '🎀', E('🎀🎁🎈🎉🎊🧧🏮🎐🕯️🧸🪄🎨🖌️🖍️✏️✒️🖊️📝📒📓📔📕📗📘📙📚📖🔖📎🖇️📌📍✂️📐📏🗂️📅📆🗓️📷📸📹🎥📱💻⌨️🎧🎤🎬🎮🕹️🎲🧩⏰⌛️💡🔦🕶️👓👗👚👕👖👠👟👜👛🎒💄💍💎🌂☂️🧳🏠🏡🏖️🏝️⛰️🗻🏕️🚗🚲✈️🚀🛸⛵️🀄️')],
+        ['符号', '✅', E('✅❌⭕️❗️❓‼️⁉️💯🔴🟠🟡🟢🔵🟣⚫️⚪️🟥🟧🟨🟩🟦🟪🔺🔻🔸🔹🔶🔷💠➡️⬅️⬆️⬇️↗️↘️↙️↖️🔄🔁🆕🆒🆗🆙🆓🔝🔜💤💢💥💦💬💭🗯️♨️🎵🎶➕➖✖️➗♾️🚫⚠️🚩')],
+    ];
 
     const SHAPES = [
         ['none', '原图'],
@@ -73,16 +85,9 @@ const Stickers = (() => {
      * @returns {Promise<{url:string,w:number,h:number,removed:number}>} removed 是被去掉的像素比例
      */
     async function cutout(url, strength = 50) {
-        const img = await loadImage(url);
-        const MAX = 1000;
-        const k = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
-        const W = Math.max(1, Math.round(img.naturalWidth * k));
-        const H = Math.max(1, Math.round(img.naturalHeight * k));
-        const c = document.createElement('canvas');
-        c.width = W;
-        c.height = H;
-        const g = c.getContext('2d', { willReadFrequently: true });
-        g.drawImage(img, 0, 0, W, H);
+        const { c, g } = await toCanvas(url);
+        const W = c.width;
+        const H = c.height;
         const im = g.getImageData(0, 0, W, H);
         const d = im.data;
         const N = W * H;
@@ -162,11 +167,17 @@ const Stickers = (() => {
             }
         }
 
-        // 4. 裁掉四周的透明部分
+        return { ...applyAlpha(c, g, im, out, url), removed: removed / N };
+    }
+
+    /** 把透明度写回画布，再裁掉四周完全透明的部分 */
+    function applyAlpha(c, g, im, alpha, url) {
+        const { width: W, height: H } = c;
+        const d = im.data;
         let x0 = W; let y0 = H; let x1 = -1; let y1 = -1;
-        for (let p = 0; p < N; p++) {
-            d[p * 4 + 3] = out[p];
-            if (out[p] > 8) {
+        for (let p = 0; p < W * H; p++) {
+            d[p * 4 + 3] = alpha[p];
+            if (alpha[p] > 8) {
                 const x = p % W;
                 const y = (p - x) / W;
                 if (x < x0) x0 = x;
@@ -176,7 +187,7 @@ const Stickers = (() => {
             }
         }
         g.putImageData(im, 0, 0);
-        if (x1 < 0) return { url, w: img.naturalWidth, h: img.naturalHeight, removed: 1 };
+        if (x1 < 0) return { url, w: W, h: H, box: { x: 0, y: 0, W, H } };
         const pad = 2;
         x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad);
         x1 = Math.min(W - 1, x1 + pad); y1 = Math.min(H - 1, y1 + pad);
@@ -186,8 +197,131 @@ const Stickers = (() => {
         crop.width = cw;
         crop.height = ch;
         crop.getContext('2d').drawImage(c, x0, y0, cw, ch, 0, 0, cw, ch);
-        return { url: crop.toDataURL('image/png'), w: cw, h: ch, removed: removed / N };
+        // box：裁剪后的图在原图（缩放到画布大小后）里的位置
+        return { url: crop.toDataURL('image/png'), w: cw, h: ch, box: { x: x0, y: y0, W, H } };
     }
 
-    return { EMOJIS, SHAPES, onPage, layer, cutout };
+    /** 画到一张最长边不超过 1000 的画布上 */
+    async function toCanvas(url) {
+        const img = await loadImage(url);
+        const k = Math.min(1, 1000 / Math.max(img.naturalWidth, img.naturalHeight));
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(img.naturalWidth * k));
+        c.height = Math.max(1, Math.round(img.naturalHeight * k));
+        const g = c.getContext('2d', { willReadFrequently: true });
+        g.drawImage(img, 0, 0, c.width, c.height);
+        return { img, c, g };
+    }
+
+    /** 图片边缘有透明像素（比如 iPhone「拷贝主体」得到的图），说明已经抠好了 */
+    async function hasTransparency(url) {
+        const { c, g } = await toCanvas(url);
+        const d = g.getImageData(0, 0, c.width, c.height).data;
+        let n = 0;
+        for (let i = 3; i < d.length; i += 4) if (d[i] < 200) n++;
+        return n / (c.width * c.height) > 0.02;
+    }
+
+    /* ---------------------------------------------------------------- 智能抠图（AI）
+     * 用 U²-Netp 模型（Apache-2.0 许可，4.5MB）识别图片里的主体，在浏览器里用 ONNX Runtime 运行。
+     * 模型文件放在仓库里（lib/u2netp.js），运行库从 jsDelivr 加载，第一次用的时候才下载。
+     * 图片始终留在你的浏览器里，不会上传到任何服务器。
+     */
+    const ORT_URL = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.2/dist/';
+    const SIZE = 320;
+    let sessionPromise = null;
+    const masks = new Map(); // 原图 → 模型输出的蒙版，调强度时不用重新识别
+
+    function loadScript(src) {
+        return new Promise((resolve, reject) => {
+            const el = document.createElement('script');
+            el.src = src;
+            el.onload = resolve;
+            el.onerror = () => { el.remove(); reject(new Error('加载失败：' + src)); };
+            document.head.appendChild(el);
+        });
+    }
+
+    function session() {
+        if (!sessionPromise) {
+            sessionPromise = (async () => {
+                if (!self.ort) await loadScript(ORT_URL + 'ort.wasm.min.js');
+                ort.env.wasm.wasmPaths = ORT_URL;
+                ort.env.wasm.numThreads = 1;
+                ort.env.logLevel = 'error';
+                if (!self.U2NETP_MODEL) await loadScript('lib/u2netp.js');
+                const bin = await (await fetch('data:application/octet-stream;base64,' + self.U2NETP_MODEL)).arrayBuffer();
+                return ort.InferenceSession.create(new Uint8Array(bin), { executionProviders: ['wasm'] });
+            })();
+            sessionPromise.catch(() => { sessionPromise = null; });
+        }
+        return sessionPromise;
+    }
+
+    async function predict(img) {
+        const sess = await session();
+        const c = document.createElement('canvas');
+        c.width = SIZE;
+        c.height = SIZE;
+        const g = c.getContext('2d', { willReadFrequently: true });
+        g.drawImage(img, 0, 0, SIZE, SIZE);
+        const d = g.getImageData(0, 0, SIZE, SIZE).data;
+        const N = SIZE * SIZE;
+        const x = new Float32Array(3 * N);
+        const mean = [0.485, 0.456, 0.406];
+        const std = [0.229, 0.224, 0.225];
+        for (let p = 0; p < N; p++) {
+            for (let ch = 0; ch < 3; ch++) x[ch * N + p] = (d[p * 4 + ch] / 255 - mean[ch]) / std[ch];
+        }
+        const out = await sess.run({ [sess.inputNames[0]]: new ort.Tensor('float32', x, [1, 3, SIZE, SIZE]) });
+        const m = out[sess.outputNames[0]].data;
+        let lo = Infinity;
+        let hi = -Infinity;
+        for (let p = 0; p < N; p++) { if (m[p] < lo) lo = m[p]; if (m[p] > hi) hi = m[p]; }
+        // 放进一张灰度图里，之后缩放到原图大小时浏览器会帮忙做平滑插值
+        const mc = document.createElement('canvas');
+        mc.width = SIZE;
+        mc.height = SIZE;
+        const mg = mc.getContext('2d');
+        const mi = mg.createImageData(SIZE, SIZE);
+        for (let p = 0; p < N; p++) {
+            const v = ((m[p] - lo) / (hi - lo || 1)) * 255;
+            mi.data[p * 4] = mi.data[p * 4 + 1] = mi.data[p * 4 + 2] = v;
+            mi.data[p * 4 + 3] = 255;
+        }
+        mg.putImageData(mi, 0, 0);
+        return mc;
+    }
+
+    /**
+     * 智能抠图
+     * @param {number} strength 1–100，越大抠得越狠（边缘半透明的部分去掉得越多）
+     */
+    async function aiCutout(url, strength = 50) {
+        const { img, c, g } = await toCanvas(url);
+        if (!masks.has(url)) masks.set(url, predict(img));
+        let mc;
+        try { mc = await masks.get(url); } catch (e) { masks.delete(url); throw e; }
+        const W = c.width;
+        const H = c.height;
+        const big = document.createElement('canvas');
+        big.width = W;
+        big.height = H;
+        const bg = big.getContext('2d', { willReadFrequently: true });
+        bg.imageSmoothingQuality = 'high';
+        bg.drawImage(mc, 0, 0, W, H);
+        const md = bg.getImageData(0, 0, W, H).data;
+        const im = g.getImageData(0, 0, W, H);
+        const lo = (strength / 100) * 0.6 - 0.05;
+        const alpha = new Uint8ClampedArray(W * H);
+        let removed = 0;
+        for (let p = 0; p < W * H; p++) {
+            const a = Math.min(1, Math.max(0, (md[p * 4] / 255 - lo) / 0.35));
+            alpha[p] = a * im.data[p * 4 + 3];
+            if (alpha[p] < 8) removed++;
+        }
+        return { ...applyAlpha(c, g, im, alpha, url), removed: removed / (W * H) };
+    }
+
+    return { EMOJI_CATS, SHAPES, onPage, layer, cutout, aiCutout, hasTransparency };
 })();

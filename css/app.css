@@ -563,27 +563,75 @@ button {
 
 /* 贴纸菜单 */
 .sticker-menu {
-    width: 300px;
+    width: 340px;
+    max-width: calc(100vw - 24px);
 }
 
-.emoji-grid {
-    display: grid;
-    grid-template-columns: repeat(8, 1fr);
+.emoji-tabs {
+    display: flex;
     gap: 2px;
-    padding: 2px 4px 4px;
+    padding: 2px 2px 6px;
+    border-bottom: 1px solid var(--ui-line);
+    overflow-x: auto;
+    scrollbar-width: none;
 }
 
-.emoji-grid button {
+.emoji-tabs button {
+    flex: 1 0 auto;
     border: 0;
     background: transparent;
-    font-size: 20px;
+    font-size: 17px;
     line-height: 1;
-    padding: 5px 0;
+    padding: 6px 4px;
     border-radius: 8px;
+    opacity: 0.5;
     font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
 }
 
-.emoji-grid button:hover { background: var(--ui-sunken); transform: scale(1.15); }
+.emoji-tabs button.on { opacity: 1; background: var(--ui-sunken); }
+
+.emoji-grid {
+    display: flex;
+    gap: 14px;
+    overflow-x: auto;
+    overscroll-behavior: contain;
+    scroll-snap-type: x proximity;
+    padding: 6px 4px 8px;
+    scrollbar-width: thin;
+}
+
+.emoji-cat {
+    flex: none;
+    scroll-snap-align: start;
+}
+
+.cat-name {
+    font-size: 11px;
+    color: var(--ui-muted);
+    padding: 0 4px 4px;
+    position: sticky;
+    left: 0;
+}
+
+.cat-grid {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(4, 38px);
+    grid-auto-columns: 38px;
+}
+
+.cat-grid button {
+    border: 0;
+    background: transparent;
+    font-size: 24px;
+    line-height: 1;
+    padding: 0;
+    border-radius: 8px;
+    font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+    transition: transform 0.1s;
+}
+
+.cat-grid button:hover { background: var(--ui-sunken); transform: scale(1.18); }
 
 .sticker-menu .check {
     display: flex;

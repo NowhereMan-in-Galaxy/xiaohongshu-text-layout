@@ -47,6 +47,14 @@ after(async () => {
 async function open({ fresh = true, viewport = { width: 1440, height: 900 } } = {}) {
     const context = await browser.newContext({ viewport, deviceScaleFactor: 1 });
     await context.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
+    // 智能抠图的运行库平时从 jsDelivr 加载，测试时改用本地 node_modules 里同一版本的文件，不依赖网络
+    await context.route(/cdn\.jsdelivr\.net\/npm\/onnxruntime-web@[^/]+\/dist\/([^?]+)/, (r) => {
+        const name = /dist\/([^?]+)/.exec(r.request().url())[1];
+        const file = path.join(ROOT, 'node_modules/onnxruntime-web/dist', path.basename(name));
+        if (!fs.existsSync(file)) return r.fulfill({ status: 404 });
+        const type = file.endsWith('.wasm') ? 'application/wasm' : 'text/javascript';
+        return r.fulfill({ status: 200, body: fs.readFileSync(file), headers: { 'content-type': type, 'access-control-allow-origin': '*' } });
+    });
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
@@ -442,6 +450,36 @@ test('自动抠图：去掉和边缘连通的纯色背景，保留主体（包�
     assert.ok(r.removed > 0.55, `背景被去掉的比例 ${r.removed}`);
     assert.equal(r.body, 255);
     assert.equal(r.hole, 255, '主体内部和背景同色的区域不应该被抠掉');
+    await context.close();
+});
+
+test('智能抠图：真实照片里识别出主体（人像、物品），背景变透明', async () => {
+    const { page, context, errors } = await open();
+    for (const [name, inside] of [['astronaut', [0.45, 0.25]], ['coffee', [0.5, 0.5]]]) {
+        const url = 'data:image/jpeg;base64,' + fs.readFileSync(path.join(ROOT, 'tests/fixtures', name + '.jpg')).toString('base64');
+        const r = await page.evaluate(async ({ u, at }) => {
+            const res = await Studio.aiCutout(u, 50);
+            const im = new Image();
+            im.src = res.url;
+            await im.decode();
+            const c = new OffscreenCanvas(res.w, res.h);
+            const g = c.getContext('2d');
+            g.drawImage(im, 0, 0);
+            const d = g.getImageData(0, 0, res.w, res.h).data;
+            // 按原图里的相对位置取透明度（裁掉的部分算全透明）
+            const a = (fx, fy) => {
+                const x = Math.round(fx * (res.box.W - 1)) - res.box.x;
+                const y = Math.round(fy * (res.box.H - 1)) - res.box.y;
+                if (x < 0 || y < 0 || x >= res.w || y >= res.h) return 0;
+                return d[(y * res.w + x) * 4 + 3];
+            };
+            return { removed: res.removed, subject: a(at[0], at[1]), corner: a(0.98, 0.03) };
+        }, { u: url, at: inside });
+        assert.ok(r.removed > 0.2 && r.removed < 0.9, `${name}：去掉的比例 ${r.removed}`);
+        assert.ok(r.subject > 200, `${name}：主体应该保留（透明度 ${r.subject}）`);
+        assert.ok(r.corner < 30, `${name}：背景应该变透明（透明度 ${r.corner}）`);
+    }
+    assert.deepEqual(errors, []);
     await context.close();
 });
 

@@ -176,7 +176,6 @@ const Render = (() => {
                 ${c.badge.trim() ? `<div class="cv-badge">${esc(c.badge.trim())}</div>` : ''}
                 <div class="cv-title">${coverTitleHtml(s, doc)}</div>
                 ${c.subtitle.trim() ? `<div class="cv-sub">${parseInline(c.subtitle.trim())}</div>` : ''}
-                ${c.sticker.trim() ? `<div class="cv-sticker">${esc(c.sticker.trim())}</div>` : ''}
                 <div class="cv-meta"><span>${esc(wm)}</span><span>${total > 1 ? `共 ${total} 页 · 左滑阅读 →` : ''}</span></div>
             </div>`);
         return el;

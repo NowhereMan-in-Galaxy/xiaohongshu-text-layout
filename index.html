@@ -146,14 +146,17 @@
                             <svg class="i" viewBox="0 0 24 24"><path d="M20 12.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6.5z"/><path d="M12.5 20v-5.5a2 2 0 0 1 2-2H20"/><circle cx="9" cy="10" r="1"/><path d="M8.5 14.5c1.5 1 3.5 1 5 0"/></svg>贴纸
                         </button>
                         <div class="menu sticker-menu" id="stickerMenu" hidden>
-                            <div class="label">点一下，加到选中的那一页</div>
+                            <div class="emoji-tabs" id="emojiTabs"></div>
                             <div class="emoji-grid" id="emojiGrid"></div>
                             <hr>
                             <button data-act="upload">
                                 <svg class="i" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>上传图片做贴纸
                             </button>
-                            <label class="check"><input type="checkbox" id="autoCut" checked> 上传后自动抠图（纯色背景效果最好）</label>
-                            <div class="label tip">拖动贴纸摆位置，拖到别的页面上就换页；拖右下角缩放、拖顶上的圆点旋转。选中后可以换形状、加白边、调图层。</div>
+                            <button data-act="paste">
+                                <svg class="i" viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h4"/></svg>粘贴图片做贴纸
+                            </button>
+                            <label class="check"><input type="checkbox" id="autoCut" checked> 自动抠图（智能识别主体，图片不会上传）</label>
+                            <div class="label tip">💡 iPhone / Mac：在「照片」里长按主体选「拷贝」，再回来点「粘贴图片做贴纸」，就能直接用苹果抠好的图。<br>拖动贴纸摆位置，拖到别的页面上就换页；拖右下角缩放、拖顶上的圆点旋转。</div>
                         </div>
                     </div>
                     <span id="pageInfo" class="muted"></span>
@@ -267,9 +270,6 @@
                             <input type="text" id="coverBadge" placeholder="例如：干货 / 保姆级 / 建议收藏">
                         </label>
                         <div class="chips" id="badgeChips"></div>
-                        <div class="row">贴纸
-                            <div class="chips" id="stickerChips"></div>
-                        </div>
                     </div>
                 </section>
 

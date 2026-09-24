@@ -27,7 +27,7 @@
         indent: false,
         bodyFont: 'theme',
         headFont: 'theme',
-        cover: { enabled: true, title: '', subtitle: '', badge: '', sticker: '✨' },
+        cover: { enabled: true, title: '', subtitle: '', badge: '' },
         header: '',
         watermark: '',
         pageNum: true,
@@ -35,7 +35,6 @@
     };
 
     const BADGES = ['干货', '保姆级', '建议收藏', '亲测有效', '新手必看', '合集'];
-    const STICKERS = ['', '✨', '🔥', '📌', '💡', '🌙', '🍓', '📚', '☕️', '🌿'];
     const TEXT_COLORS = ['#e8804a', '#ff2442', '#e0607e', '#f5a623', '#2ed573', '#12a150', '#1e90ff', '#2f6feb', '#8b6cff', '#a55eea', '#8a8a8a', '#1d1d1f'];
 
     const SAMPLE = `# 把长文排成==好看的卡片==，只要三步
@@ -585,13 +584,24 @@
         if (now) { saveNow(); toast('已保存到草稿箱'); } else saveLater();
     }
 
+    /** 读取草稿里的贴纸。旧版草稿的「封面贴纸」设置会变成封面上一张可以拖动的贴纸 */
+    function stickersOf(d) {
+        const list = d.stickers || [];
+        const old = d.settings && d.settings.cover && d.settings.cover.sticker;
+        if (old && old.trim() && d.settings.cover.enabled !== false) {
+            list.push({ id: Store.drafts.newId(), page: 0, kind: 'emoji', text: old.trim(), x: 990, y: 70, w: 200, rot: 12, shape: 'none', outline: false, shadow: false });
+        }
+        if (d.settings && d.settings.cover) delete d.settings.cover.sticker;
+        return list;
+    }
+
     function loadDraft(id) {
         const d = Store.drafts.load(id);
         if (!d) return;
         state.draftId = id;
         state.text = d.text || '';
+        state.stickers = stickersOf(d);
         state.settings = mergeSettings(d.settings);
-        state.stickers = d.stickers || [];
         state.sel = null;
         ed.value = state.text;
         syncSettingsUI();
@@ -649,8 +659,6 @@
             </button>`).join('');
 
         $('#badgeChips').innerHTML = BADGES.map((b) => `<button data-badge="${b}">${b}</button>`).join('');
-        $('#stickerChips').classList.add('emoji');
-        $('#stickerChips').innerHTML = STICKERS.map((s) => `<button data-sticker="${s}" title="${s ? '贴纸' : '不要贴纸'}">${s || '无'}</button>`).join('');
         $('#colorMenu').innerHTML = TEXT_COLORS.map((c) => `<button data-color="${c}" style="background:${c}" title="${c}"></button>`).join('');
     }
 
@@ -682,7 +690,6 @@
         $('#coverSub').value = s.cover.subtitle;
         $('#coverBadge').value = s.cover.badge;
         $$('#badgeChips button').forEach((b) => b.classList.toggle('on', b.dataset.badge === s.cover.badge));
-        $$('#stickerChips button').forEach((b) => b.classList.toggle('on', b.dataset.sticker === s.cover.sticker));
         $('#header').value = s.header;
         $('#watermark').value = s.watermark;
         $('#pageNum').checked = s.pageNum;
@@ -773,16 +780,10 @@
             setSetting('cover.badge', v);
             syncSettingsUI();
         });
-        $('#stickerChips').addEventListener('click', (e) => {
-            const b = e.target.closest('[data-sticker]');
-            if (!b) return;
-            setSetting('cover.sticker', b.dataset.sticker);
-            syncSettingsUI();
-        });
 
         $('#resetStyle').addEventListener('click', () => {
             const keep = { cover: state.settings.cover, header: state.settings.header, watermark: state.settings.watermark };
-            state.settings = mergeSettings({ ...clone(DEFAULTS), ...keep, cover: { ...keep.cover, sticker: DEFAULTS.cover.sticker } });
+            state.settings = mergeSettings({ ...clone(DEFAULTS), ...keep, cover: keep.cover });
             syncSettingsUI();
             schedule();
             toast('样式已恢复默认');
@@ -968,7 +969,11 @@
             if (isImg) {
                 html += `<select data-act="shape" title="形状">${Stickers.SHAPES.map(([v, n]) => `<option value="${v}"${(st.shape || 'none') === v ? ' selected' : ''}>${n}</option>`).join('')}</select>`;
                 html += `<button data-act="cut" class="${st.cut ? 'on' : ''}" title="自动去掉背景">抠图</button>`;
-                if (st.cut) html += `<label class="cut-range" title="抠得不干净就往右拖，抠过头了就往左拖"><input type="range" data-act="strength" min="1" max="100" value="${st.cut}"></label>`;
+                if (st.cut) {
+                    const mode = st.cutMode || 'ai';
+                    html += `<select data-act="cutmode" title="抠图方式"><option value="ai"${mode === 'ai' ? ' selected' : ''}>智能识别</option><option value="color"${mode === 'color' ? ' selected' : ''}>纯色背景</option></select>`;
+                    html += `<label class="cut-range" title="抠得不干净就往右拖，抠过头了就往左拖"><input type="range" data-act="strength" min="1" max="100" value="${st.cut}"></label>`;
+                }
             }
             html += `<button data-act="outline" class="${st.outline ? 'on' : ''}" title="像真贴纸一样描一圈白边">白边</button>`;
             html += `<button data-act="shadow" class="${st.shadow ? 'on' : ''}" title="投影">阴影</button><span class="sep"></span>`;
@@ -1052,13 +1057,17 @@
 
     async function addStickerImages(files) {
         const list = [...files].filter((f) => f.type.startsWith('image/'));
+        if (!list.length) return;
+        if (state.view !== 'grid') setView('grid');
+        if (matchMedia('(max-width: 820px)').matches) setPane('preview');
         const cut = $('#autoCut').checked;
         for (const f of list) {
             toast('正在添加贴纸…', 0);
             try {
                 const id = await Images.add(f, { png: true });
                 const st = addSticker({ kind: 'img', src: id, orig: id, cut: 0 });
-                if (cut) await cutSticker(st, 50, true);
+                if (await Stickers.hasTransparency(Images.cache.get(id).url)) toast('这张图已经是透明背景了，直接用上（不用再抠）');
+                else if (cut) await cutSticker(st, 50, true);
                 else toast('贴纸已添加，拖动它摆到喜欢的位置');
             } catch (e) {
                 console.error(e);
@@ -1067,6 +1076,8 @@
         }
     }
 
+    let modelLoaded = false;
+
     /** 抠图。strength 为 0 表示恢复原图 */
     async function cutSticker(st, strength, auto) {
         const old = st.src;
@@ -1074,21 +1085,79 @@
             st.src = st.orig;
             st.cut = 0;
         } else {
-            toast('正在抠图…', 0);
             const orig = Images.cache.get(st.orig) || await Images.load(st.orig);
             if (!orig) { toast('找不到原图了'); return; }
-            const res = await Stickers.cutout(orig.url, strength);
+            let res;
+            if ((st.cutMode || 'ai') === 'ai') {
+                toast(modelLoaded ? '正在识别主体…' : '第一次用智能抠图，正在加载识别模型，稍等几秒…', 0);
+                try {
+                    res = await Stickers.aiCutout(orig.url, strength);
+                    modelLoaded = true;
+                } catch (e) {
+                    console.warn('智能抠图不可用，改用纯色背景抠图', e);
+                    st.cutMode = 'color';
+                    toast('智能抠图加载失败（可能是网络问题），先用「纯色背景」方式抠', 3500);
+                }
+            }
+            if (!res) {
+                if (st.cutMode !== 'color') toast('正在抠图…', 0);
+                res = await Stickers.cutout(orig.url, strength);
+            }
             if (res.removed < 0.01 || res.removed > 0.98) {
-                if (auto) toast('贴纸已添加。这张图没找到明显的纯色背景，保留了原图');
-                else toast(res.removed > 0.98 ? '抠过头了，整张图都被去掉了，把强度往左调一调' : '没找到明显的纯色背景。自动抠图适合白底、纯色底的图');
-                if (auto || res.removed > 0.98) { renderBar(); return; }
+                const msg = res.removed > 0.98
+                    ? '抠过头了，整张图都被去掉了。把强度往左调一调，或者换一种抠图方式'
+                    : (st.cutMode === 'color' ? '没找到明显的纯色背景。试试工具条上的「智能识别」' : '没识别出需要去掉的背景');
+                toast(auto ? '贴纸已添加。' + msg : msg, 3500);
+                if (auto || res.removed > 0.98) { commitStickers(); return; }
             }
             st.src = await Images.put({ url: res.url, w: res.w, h: res.h });
             st.cut = strength;
-            if (!auto || res.removed >= 0.01) toast('抠好了！不满意可以拖工具条上的滑块调强度');
+            if (res.removed >= 0.01) toast('抠好了！不满意可以拖工具条上的滑块调强度');
         }
         if (old !== st.orig && old !== st.src) Store.assets.remove(old);
         commitStickers();
+    }
+
+    /* ---------------- 表情面板：像输入法的表情键盘一样左右滑 ---------------- */
+
+    function renderEmojiPicker() {
+        const recent = Store.local.get('recent-emoji', []);
+        const cats = [...(recent.length ? [['最近', '🕘', recent]] : []), ...Stickers.EMOJI_CATS];
+        $('#emojiTabs').innerHTML = cats.map(([name, icon], i) => `<button data-cat="${i}" title="${name}"${i === 0 ? ' class="on"' : ''}>${icon}</button>`).join('');
+        $('#emojiGrid').innerHTML = cats.map(([name, , list], i) => `
+            <section class="emoji-cat" data-cat="${i}">
+                <div class="cat-name">${name}</div>
+                <div class="cat-grid">${list.map((em) => `<button data-emoji="${em}">${em}</button>`).join('')}</div>
+            </section>`).join('');
+        $('#emojiGrid').scrollLeft = 0;
+    }
+
+    function useEmoji(em) {
+        const recent = [em, ...Store.local.get('recent-emoji', []).filter((x) => x !== em)].slice(0, 24);
+        Store.local.set('recent-emoji', recent);
+        addSticker({ kind: 'emoji', text: em });
+        toast('拖动贴纸摆到喜欢的位置', 1600);
+    }
+
+    function syncEmojiTabs() {
+        const grid = $('#emojiGrid');
+        let cur = 0;
+        $$('#emojiGrid .emoji-cat').forEach((sec, i) => { if (sec.offsetLeft - grid.offsetLeft <= grid.scrollLeft + 40) cur = i; });
+        $$('#emojiTabs button').forEach((b, i) => b.classList.toggle('on', i === cur));
+    }
+
+    async function pasteSticker() {
+        try {
+            const items = await navigator.clipboard.read();
+            const files = [];
+            for (const it of items) {
+                const type = it.types.find((t) => t.startsWith('image/'));
+                if (type) files.push(new File([await it.getType(type)], 'paste.png', { type }));
+            }
+            if (files.length) { toggleMenu($('#stickerMenu'), false); addStickerImages(files); } else toast('剪贴板里没有图片');
+        } catch {
+            toast('浏览器不让直接读取剪贴板。可以在预览区按 Ctrl/⌘ + V 粘贴', 3500);
+        }
     }
 
     /* ---------------- 图片：改写 Markdown ---------------- */
@@ -1292,6 +1361,7 @@
             case 'shadow': st.shadow = !st.shadow; commitStickers(); break;
             case 'cut': cutSticker(st, st.cut ? 0 : 50); break;
             case 'strength': cutSticker(st, Number(b.value)); break;
+            case 'cutmode': st.cutMode = b.value; cutSticker(st, 50); break;
             case 'dup': {
                 const { id, ...rest } = st;
                 addSticker({ ...rest, x: st.x + 50, y: st.y + 50 });
@@ -1384,11 +1454,29 @@
         $('#objBar').addEventListener('click', onBarAction);
         $('#objBar').addEventListener('change', onBarAction);
         $('#stickerBtn').addEventListener('click', () => toggleMenu($('#stickerMenu')));
-        $('#emojiGrid').innerHTML = Stickers.EMOJIS.map((em) => `<button data-emoji="${em}">${em}</button>`).join('');
+        $('#stickerBtn').addEventListener('click', () => { if (!$('#stickerMenu').hidden) renderEmojiPicker(); });
+        renderEmojiPicker();
         $('#stickerMenu').addEventListener('click', (e) => {
             const em = e.target.closest('[data-emoji]');
-            if (em) { addSticker({ kind: 'emoji', text: em.dataset.emoji }); toast('拖动贴纸摆到喜欢的位置', 1600); }
+            if (em) useEmoji(em.dataset.emoji);
+            const tab = e.target.closest('[data-cat]');
+            if (tab && tab.parentElement.id === 'emojiTabs') {
+                const sec = $(`#emojiGrid .emoji-cat[data-cat="${tab.dataset.cat}"]`);
+                $('#emojiGrid').scrollTo({ left: sec.offsetLeft - $('#emojiGrid').offsetLeft, behavior: 'smooth' });
+            }
             if (e.target.closest('[data-act="upload"]')) { toggleMenu($('#stickerMenu'), false); $('#stickerInput').click(); }
+            if (e.target.closest('[data-act="paste"]')) pasteSticker();
+        });
+        $('#emojiGrid').addEventListener('scroll', syncEmojiTabs, { passive: true });
+        // 鼠标滚轮上下滚，面板左右滑
+        $('#emojiGrid').addEventListener('wheel', (e) => {
+            if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { e.preventDefault(); $('#emojiGrid').scrollLeft += e.deltaY; }
+        }, { passive: false });
+        // 不在输入框里时粘贴图片 → 变成贴纸（比如 iPhone 相册里长按照片「拷贝主体」后粘贴）
+        document.addEventListener('paste', (e) => {
+            if (e.target.closest && e.target.closest('input, textarea, [contenteditable]')) return;
+            const files = [...(e.clipboardData?.files || [])].filter((f) => f.type.startsWith('image/'));
+            if (files.length) { e.preventDefault(); addStickerImages(files); }
         });
         $('#stickerInput').addEventListener('change', (e) => { addStickerImages(e.target.files); e.target.value = ''; });
         $('#grid').addEventListener('dblclick', (e) => {
@@ -1507,8 +1595,8 @@
         if (draft) {
             state.draftId = lastId;
             state.text = draft.text || '';
+            state.stickers = stickersOf(draft);
             state.settings = mergeSettings(draft.settings);
-            state.stickers = draft.stickers || [];
         } else {
             state.draftId = Store.drafts.newId();
             state.text = SAMPLE;
@@ -1541,6 +1629,7 @@
         addSticker,
         select,
         cutout: Stickers.cutout,
+        aiCutout: Stickers.aiCutout,
         SAMPLE,
     };
     window.Studio.ready = init();
