@@ -561,6 +561,200 @@ button {
 .thumb-bar button:hover { background: var(--ui-panel); color: var(--ui-text); }
 .thumb-bar .i { width: 14px; height: 14px; }
 
+/* 贴纸菜单 */
+.sticker-menu {
+    width: 340px;
+    max-width: calc(100vw - 24px);
+}
+
+.emoji-tabs {
+    display: flex;
+    gap: 2px;
+    padding: 2px 2px 6px;
+    border-bottom: 1px solid var(--ui-line);
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.emoji-tabs button {
+    flex: 1 0 auto;
+    border: 0;
+    background: transparent;
+    font-size: 17px;
+    line-height: 1;
+    padding: 6px 4px;
+    border-radius: 8px;
+    opacity: 0.5;
+    font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+}
+
+.emoji-tabs button.on { opacity: 1; background: var(--ui-sunken); }
+
+.emoji-grid {
+    display: flex;
+    gap: 14px;
+    overflow-x: auto;
+    overscroll-behavior: contain;
+    scroll-snap-type: x proximity;
+    padding: 6px 4px 8px;
+    scrollbar-width: thin;
+}
+
+.emoji-cat {
+    flex: none;
+    scroll-snap-align: start;
+}
+
+.cat-name {
+    font-size: 11px;
+    color: var(--ui-muted);
+    padding: 0 4px 4px;
+    position: sticky;
+    left: 0;
+}
+
+.cat-grid {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(4, 38px);
+    grid-auto-columns: 38px;
+}
+
+.cat-grid button {
+    border: 0;
+    background: transparent;
+    font-size: 24px;
+    line-height: 1;
+    padding: 0;
+    border-radius: 8px;
+    font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+    transition: transform 0.1s;
+}
+
+.cat-grid button:hover { background: var(--ui-sunken); transform: scale(1.18); }
+
+.sticker-menu .check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px 6px;
+    font-size: 12px;
+    color: var(--ui-muted);
+}
+
+.sticker-menu .tip {
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: normal;
+}
+
+/* 预览里可以直接拖动的贴纸和图片 */
+#grid .stk {
+    pointer-events: auto;
+    cursor: move;
+    touch-action: none;
+}
+
+#grid .fig { position: relative; }
+#grid .fig img { cursor: pointer; }
+
+#grid .sel-obj {
+    outline: calc(2px * var(--inv, 3)) dashed var(--ui-brand);
+    outline-offset: calc(3px * var(--inv, 3));
+}
+
+.obj-h {
+    position: absolute;
+    width: calc(16px * var(--inv, 3));
+    height: calc(16px * var(--inv, 3));
+    border-radius: 50%;
+    background: #fff;
+    border: calc(2px * var(--inv, 3)) solid var(--ui-brand);
+    box-shadow: 0 0 0 calc(1px * var(--inv, 3)) rgba(0, 0, 0, 0.15);
+    pointer-events: auto;
+    touch-action: none;
+    z-index: 2;
+}
+
+.obj-h.h-size {
+    right: 0;
+    bottom: 0;
+    transform: translate(50%, 50%);
+    cursor: nwse-resize;
+}
+
+.obj-h.h-rot {
+    left: 50%;
+    top: calc(-30px * var(--inv, 3));
+    transform: translateX(-50%);
+    cursor: grab;
+}
+
+.obj-h.h-rot::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    width: calc(2px * var(--inv, 3));
+    height: calc(12px * var(--inv, 3));
+    background: var(--ui-brand);
+    transform: translateX(-50%);
+}
+
+.obj-h.h-img {
+    transform: translate(-50%, -50%);
+    cursor: nwse-resize;
+}
+
+.obj-h.h-img.left { cursor: nesw-resize; }
+
+body.dragging,
+body.dragging * {
+    user-select: none;
+    cursor: grabbing !important;
+}
+
+/* 选中对象时的浮动工具条 */
+.objbar {
+    position: fixed;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px;
+    border-radius: 12px;
+    background: var(--ui-panel);
+    border: 1px solid var(--ui-line);
+    box-shadow: var(--ui-shadow);
+    font-size: 12px;
+    white-space: nowrap;
+    max-width: calc(100vw - 16px);
+    overflow-x: auto;
+}
+
+.objbar button,
+.objbar select {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    height: 30px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ui-text);
+    font-size: 12px;
+}
+
+.objbar select { border: 1px solid var(--ui-line); background: var(--ui-panel); }
+.objbar button:hover:not(:disabled) { background: var(--ui-sunken); }
+.objbar button.on { background: var(--ui-brand-soft); color: var(--ui-brand); }
+.objbar button:disabled { opacity: 0.35; cursor: default; }
+.objbar .i { width: 16px; height: 16px; }
+.objbar .sep { width: 1px; height: 18px; background: var(--ui-line); margin: 0 3px; }
+.objbar .pct { min-width: 40px; text-align: center; color: var(--ui-muted); font-variant-numeric: tabular-nums; }
+.objbar .cut-range input { width: 80px; vertical-align: middle; }
+
 /* 设置区 */
 .settings-pane {
     background: var(--ui-panel);
@@ -1219,6 +1413,77 @@ input[type="range"] {
 .cheats mark { background: rgba(255, 210, 0, 0.55); color: inherit; }
 
 .dialog .btn { width: 100%; }
+
+/* 裁剪框 */
+.crop-dialog { width: min(640px, calc(100vw - 32px)); }
+.crop-dialog .btn { width: auto; }
+.crop-tip { margin: -6px 0 14px; font-size: 13px; color: var(--ui-muted); line-height: 1.6; }
+.crop-tip b { color: var(--ui-text); font-weight: 600; }
+
+.crop-wrap {
+    display: flex;
+    justify-content: center;
+    padding: 10px;
+    border-radius: 12px;
+    background-color: var(--ui-sunken);
+    background-image: conic-gradient(var(--ui-line) 25%, transparent 0 50%, var(--ui-line) 0 75%, transparent 0);
+    background-size: 16px 16px;
+}
+
+.crop-stage {
+    position: relative;
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
+    cursor: crosshair;
+    line-height: 0;
+}
+
+.crop-stage img {
+    display: block;
+    max-width: 100%;
+    max-height: 56vh;
+    pointer-events: none;
+}
+
+.crop-box {
+    position: absolute;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+    outline: 2px solid #fff;
+    cursor: move;
+}
+
+.crop-box i {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    background: #fff;
+    border: 2px solid var(--ui-brand);
+    border-radius: 50%;
+    margin: -1px;
+}
+
+/* 手柄放在框的四个角内侧，框贴着图片边缘时也不会被裁掉 */
+.crop-box i[data-c="nw"] { left: 0; top: 0; cursor: nwse-resize; }
+.crop-box i[data-c="ne"] { right: 0; top: 0; cursor: nesw-resize; }
+.crop-box i[data-c="sw"] { left: 0; bottom: 0; cursor: nesw-resize; }
+.crop-box i[data-c="se"] { right: 0; bottom: 0; cursor: nwse-resize; }
+
+.crop-cut {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 14px 0 16px;
+    font-size: 13px;
+}
+
+.crop-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.crop-actions .grow { flex: 1; }
 
 .scrim {
     position: fixed;

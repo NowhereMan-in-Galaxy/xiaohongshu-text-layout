@@ -47,6 +47,14 @@ after(async () => {
 async function open({ fresh = true, viewport = { width: 1440, height: 900 } } = {}) {
     const context = await browser.newContext({ viewport, deviceScaleFactor: 1 });
     await context.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
+    // 智能抠图的运行库平时从 jsDelivr 加载，测试时改用本地 node_modules 里同一版本的文件，不依赖网络
+    await context.route(/cdn\.jsdelivr\.net\/npm\/onnxruntime-web@[^/]+\/dist\/([^?]+)/, (r) => {
+        const name = /dist\/([^?]+)/.exec(r.request().url())[1];
+        const file = path.join(ROOT, 'node_modules/onnxruntime-web/dist', path.basename(name));
+        if (!fs.existsSync(file)) return r.fulfill({ status: 404 });
+        const type = file.endsWith('.wasm') ? 'application/wasm' : 'text/javascript';
+        return r.fulfill({ status: 200, body: fs.readFileSync(file), headers: { 'content-type': type, 'access-control-allow-origin': '*' } });
+    });
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
@@ -225,44 +233,47 @@ test('分页符 --- 强制换页，标题不会孤零零留在页尾', async () 
     await context.close();
 });
 
+/** 把第 idx 页正常渲染出来截图，再和导出的 PNG 逐像素对比，返回差异比例和尺寸 */
+async function fidelity(page, idx) {
+    await page.evaluate((i) => {
+        const holder = document.createElement('div');
+        holder.id = 'fidelity';
+        holder.style.cssText = 'position:fixed;left:0;top:0;z-index:9999';
+        holder.appendChild(Studio.buildPage(i));
+        document.body.appendChild(holder);
+    }, idx);
+    await page.setViewportSize({ width: 1100, height: 1500 });
+    await page.evaluate(() => Promise.all([...document.querySelectorAll('#fidelity img')].map((im) => im.decode().catch(() => { }))));
+    const shot = await page.locator('#fidelity > .pg').screenshot();
+    await page.evaluate(() => document.getElementById('fidelity').remove());
+
+    return page.evaluate(async ({ i, png }) => {
+        const blob = await Studio.exportPage(i, 1);
+        const a = await createImageBitmap(blob);
+        const b = await createImageBitmap(await (await fetch('data:image/png;base64,' + png)).blob());
+        const read = (img) => {
+            const c = new OffscreenCanvas(img.width, img.height);
+            const g = c.getContext('2d');
+            g.drawImage(img, 0, 0);
+            return g.getImageData(0, 0, img.width, img.height).data;
+        };
+        const da = read(a);
+        const db = read(b);
+        let diff = 0;
+        for (let k = 0; k < da.length; k += 4) {
+            if (Math.abs(da[k] - db[k]) + Math.abs(da[k + 1] - db[k + 1]) + Math.abs(da[k + 2] - db[k + 2]) > 60) diff++;
+        }
+        const big = await createImageBitmap(await Studio.exportPage(i, 2));
+        return { w: a.width, h: a.height, sw: b.width, sh: b.height, ratio: diff / (a.width * a.height), w2: big.width, h2: big.height };
+    }, { i: idx, png: shot.toString('base64') });
+}
+
 test('导出的 PNG 尺寸正确，并且和屏幕上的渲染逐像素一致', async () => {
     const { page, context } = await open();
     for (const theme of ['cream', 'night', 'grid', 'candy']) {
         await page.evaluate((t) => Studio.setSettings({ theme: t }), theme);
         for (const i of [0, 1]) {
-            // 1. 让浏览器正常渲染这一页，截图
-            await page.evaluate((idx) => {
-                const holder = document.createElement('div');
-                holder.id = 'fidelity';
-                holder.style.cssText = 'position:fixed;left:0;top:0;z-index:9999';
-                holder.appendChild(Studio.buildPage(idx));
-                document.body.appendChild(holder);
-            }, i);
-            await page.setViewportSize({ width: 1100, height: 1500 });
-            const shot = await page.locator('#fidelity > .pg').screenshot();
-            await page.evaluate(() => document.getElementById('fidelity').remove());
-
-            // 2. 用导出功能生成图片，逐像素对比
-            const result = await page.evaluate(async ({ idx, png }) => {
-                const blob = await Studio.exportPage(idx, 1);
-                const a = await createImageBitmap(blob);
-                const b = await createImageBitmap(await (await fetch('data:image/png;base64,' + png)).blob());
-                const read = (img) => {
-                    const c = new OffscreenCanvas(img.width, img.height);
-                    const g = c.getContext('2d');
-                    g.drawImage(img, 0, 0);
-                    return g.getImageData(0, 0, img.width, img.height).data;
-                };
-                const da = read(a);
-                const db = read(b);
-                let diff = 0;
-                for (let k = 0; k < da.length; k += 4) {
-                    if (Math.abs(da[k] - db[k]) + Math.abs(da[k + 1] - db[k + 1]) + Math.abs(da[k + 2] - db[k + 2]) > 60) diff++;
-                }
-                const big = await createImageBitmap(await Studio.exportPage(idx, 2));
-                return { w: a.width, h: a.height, sw: b.width, sh: b.height, ratio: diff / (a.width * a.height), w2: big.width, h2: big.height };
-            }, { idx: i, png: shot.toString('base64') });
-
+            const result = await fidelity(page, i);
             assert.equal(result.w, 1080);
             assert.equal(result.h, 1440);
             assert.equal(result.w2, 2160);
@@ -271,6 +282,229 @@ test('导出的 PNG 尺寸正确，并且和屏幕上的渲染逐像素一致', 
             assert.ok(result.ratio < 0.003, `${theme} 第 ${i + 1} 页：导出图和屏幕渲染差异 ${(result.ratio * 100).toFixed(2)}%`);
         }
     }
+    await context.close();
+});
+
+/** 在页面里画一张纯色背景的测试图，返回 data URL */
+const makeImage = (page, w, h, color, bg = null) => page.evaluate(([w2, h2, c, b]) => {
+    const cv = document.createElement('canvas');
+    cv.width = w2;
+    cv.height = h2;
+    const g = cv.getContext('2d');
+    g.fillStyle = b || c;
+    g.fillRect(0, 0, w2, h2);
+    if (b) {
+        g.fillStyle = c;
+        g.beginPath();
+        g.arc(w2 / 2, h2 / 2, Math.min(w2, h2) * 0.3, 0, Math.PI * 2);
+        g.fill();
+    }
+    return cv.toDataURL('image/png');
+}, [w, h, color, bg]);
+
+test('图片：宽度百分比、靠左靠右、同一行多张图并排且高度一致', async () => {
+    const { page, context, errors } = await open();
+    const a = await makeImage(page, 300, 450, '#e88');
+    const b = await makeImage(page, 300, 500, '#88e');
+    const c = await makeImage(page, 800, 400, '#8c8');
+    await page.evaluate((t) => Studio.setText(t), `# 标题\n段落\n![](${a}) ![](${b})\n![说明](${c}){50% right}\n![](${c}){30% left}\n结尾`);
+    const r = await page.evaluate(() => {
+        const box = (el) => el.getBoundingClientRect();
+        const row = document.querySelector('#grid .fig.row');
+        const [i1, i2] = [...row.querySelectorAll('img')].map(box);
+        const right = document.querySelector('#grid .fig.al-right img');
+        const left = document.querySelector('#grid .fig.al-left img');
+        const body = box(right.closest('.pg-body'));
+        return {
+            rowH: [i1.height, i2.height],
+            rowFill: (i2.right - i1.left) / (body.width),
+            right: [box(right).width / body.width, body.right - box(right).right],
+            left: [box(left).width / body.width, box(left).left - body.left],
+        };
+    });
+    assert.ok(Math.abs(r.rowH[0] - r.rowH[1]) < 1, `并排的两张图应该一样高：${r.rowH}`);
+    assert.ok(r.rowFill > 0.97, '并排的图应该占满一行');
+    assert.ok(Math.abs(r.right[0] - 0.5) < 0.01 && r.right[1] < 1, `50% 靠右：${r.right}`);
+    assert.ok(Math.abs(r.left[0] - 0.3) < 0.01 && r.left[1] < 1, `30% 靠左：${r.left}`);
+
+    // 在预览里点图片、拖右下角的圆点调大小，松手后写回 Markdown
+    const img = page.locator('#grid .fig.al-left img');
+    await img.click();
+    const h = page.locator('#grid .obj-h.h-img');
+    const hb = await h.boundingBox();
+    await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(hb.x + 60, hb.y + 10, { steps: 6 });
+    await page.mouse.up();
+    const line = (await page.locator('#editor').inputValue()).split('\n')[4];
+    const pct = Number(/\{(\d+)% left\}/.exec(line)?.[1]);
+    assert.ok(pct > 30 && pct <= 100, `拖动后宽度应该变大：${line.slice(-20)}`);
+
+    // 工具条：和上一张并排
+    await page.waitForFunction(() => !document.querySelector('#objBar').hidden);
+    await page.locator('#objBar [data-act="merge"]').click();
+    await page.waitForFunction(() => {
+        const blocks = Studio.state.model.doc.blocks;
+        return blocks.filter((b) => b.type === 'imgrow').length === 2 && !blocks.some((b) => b.type === 'img');
+    });
+    const merged = (await page.locator('#editor').inputValue()).split('\n')[3];
+    assert.equal((merged.match(/!\[/g) || []).length, 2, '两张图应该合到同一行');
+    assert.ok(!/%/.test(merged), '并排后不再保留单张图的宽度设置');
+    assert.deepEqual(errors.filter((e) => !/Failed to load/.test(e)), []);
+    await context.close();
+});
+
+test('贴纸：添加、拖动、拖到别的页、调图层，导出和屏幕一致，刷新后还在', async () => {
+    const { page, context, errors } = await open();
+    const photo = await makeImage(page, 400, 300, '#2a7', '#ffffff');
+    await page.evaluate(async (url) => {
+        Studio.state.selected = 1;
+        Studio.addSticker({ kind: 'emoji', text: '🔥', outline: true });
+        const blob = await (await fetch(url)).blob();
+        const file = new File([blob], 'p.png', { type: 'image/png' });
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        const input = document.getElementById('stickerInput');
+        input.files = dt.files;
+        input.dispatchEvent(new Event('change'));
+    }, photo);
+    // 上传后先弹出裁剪框：在图上拖出一个新框，只保留中间部分
+    await page.locator('#cropDialog[open]').waitFor();
+    const stage = await page.locator('#cropStage').boundingBox();
+    await page.mouse.move(stage.x + stage.width * 0.1, stage.y + stage.height * 0.1);
+    await page.mouse.down();
+    await page.mouse.move(stage.x + stage.width * 0.9, stage.y + stage.height * 0.9, { steps: 5 });
+    await page.mouse.up();
+    assert.equal(await page.locator('#cropCut').isChecked(), true, '默认勾选自动抠图');
+    await page.locator('#cropDialog button[value="ok"]').click();
+    await page.waitForFunction(() => Studio.state.stickers.length === 2 && Studio.state.stickers[1].cut > 0);
+    let sts = await page.evaluate(() => Studio.state.stickers);
+    assert.equal(sts[0].page, 1);
+    assert.notEqual(sts[1].src, sts[1].orig, '上传的图片应该自动抠图');
+    assert.ok(Math.abs(sts[1].crop.x - 0.1) < 0.02 && Math.abs(sts[1].crop.w - 0.8) < 0.02, `裁剪范围 ${JSON.stringify(sts[1].crop)}`);
+    const dims = await page.evaluate((st) => Studio.imageSize(st.orig), sts[1]);
+    assert.ok(Math.abs(dims.w - 320) <= 2 && Math.abs(dims.h - 240) <= 2, `裁剪后的图应该是原图中间 80%：${dims.w}×${dims.h}`);
+
+    // 取消裁剪框不会添加贴纸
+    await page.evaluate(async (url) => {
+        const dt = new DataTransfer();
+        dt.items.add(new File([await (await fetch(url)).blob()], 'p.png', { type: 'image/png' }));
+        const input = document.getElementById('stickerInput');
+        input.files = dt.files;
+        input.dispatchEvent(new Event('change'));
+    }, photo);
+    await page.locator('#cropDialog[open]').waitFor();
+    await page.locator('#cropDialog button[value="cancel"]').click();
+    await page.waitForTimeout(200);
+    assert.equal(await page.evaluate(() => Studio.state.stickers.length), 2);
+
+    // 图层：选中后面那张（在上层），下移一层
+    await page.locator(`#grid .stk[data-sid="${sts[1].id}"]`).click();
+    await page.locator('#objBar [data-act="down"]').click();
+    sts = await page.evaluate(() => Studio.state.stickers);
+    assert.equal(sts[0].kind, 'img', '下移一层后应该排到前面（下层）');
+
+    // 形状和白边
+    await page.locator('#objBar select[data-act="shape"]').selectOption('heart');
+    await page.locator('#objBar [data-act="outline"]').click();
+    await page.waitForFunction(() => document.querySelector('#grid .stk.sh-heart.outline'));
+
+    // 拖动贴纸：先在页内挪一下，再拖到封面上
+    const stk = page.locator(`#grid .stk[data-sid="${sts[1].id}"]`);
+    let bx = await stk.boundingBox();
+    const x0 = await page.evaluate((id) => Studio.state.stickers.find((s) => s.id === id).x, sts[1].id);
+    await page.mouse.move(bx.x + bx.width / 2, bx.y + bx.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(bx.x + bx.width / 2 + 30, bx.y + bx.height / 2, { steps: 5 });
+    await page.mouse.up();
+    const x1 = await page.evaluate((id) => Studio.state.stickers.find((s) => s.id === id).x, sts[1].id);
+    const k = await page.evaluate(() => Studio.state.zoom / 1080);
+    assert.ok(Math.abs(x1 - x0 - 30 / k) < 3, `拖动 30px 应该移动 ${30 / k} 页面像素，实际 ${x1 - x0}`);
+
+    const cover = await page.locator('#grid .thumb-frame').first().boundingBox();
+    bx = await stk.boundingBox();
+    await page.mouse.move(bx.x + bx.width / 2, bx.y + bx.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(cover.x + cover.width / 2, cover.y + cover.height * 0.7, { steps: 10 });
+    await page.mouse.up();
+    assert.equal(await page.evaluate((id) => Studio.state.stickers.find((s) => s.id === id).page, sts[1].id), 0);
+
+    // 导出的图和屏幕一致（形状、白边、表情都要画对）
+    for (const i of [0, 1]) {
+        const res = await fidelity(page, i);
+        assert.ok(res.ratio < 0.003, `带贴纸的第 ${i + 1} 页：导出图和屏幕渲染差异 ${(res.ratio * 100).toFixed(2)}%`);
+    }
+
+    // 删除键删除选中的贴纸；刷新后剩下的贴纸还在
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.locator(`#grid .stk[data-sid="${sts[1].id}"]`).click();
+    await page.keyboard.press('Delete');
+    assert.equal(await page.evaluate(() => Studio.state.stickers.length), 1);
+    await page.waitForFunction(() => document.querySelector('#saveState').textContent === '已自动保存');
+    await page.reload();
+    await page.evaluate(() => window.Studio.ready);
+    assert.equal(await page.locator('#grid .stk').count(), 1);
+    assert.deepEqual(errors, []);
+    await context.close();
+});
+
+test('自动抠图：去掉和边缘连通的纯色背景，保留主体（包括主体里和背景同色的部分）', async () => {
+    const { page, context } = await open();
+    const r = await page.evaluate(async () => {
+        const cv = document.createElement('canvas');
+        cv.width = 300;
+        cv.height = 200;
+        const g = cv.getContext('2d');
+        g.fillStyle = '#f4f4f2';
+        g.fillRect(0, 0, 300, 200);
+        g.fillStyle = '#3355cc';
+        g.fillRect(60, 40, 180, 120);
+        g.fillStyle = '#f4f4f2'; // 主体中间一块和背景同色，不应该被去掉
+        g.fillRect(130, 80, 40, 40);
+        const res = await Studio.cutout(cv.toDataURL('image/png'), 50);
+        const im = new Image();
+        im.src = res.url;
+        await im.decode();
+        const c2 = new OffscreenCanvas(res.w, res.h);
+        const g2 = c2.getContext('2d');
+        g2.drawImage(im, 0, 0);
+        const a = (x, y) => g2.getImageData(x, y, 1, 1).data[3];
+        return { w: res.w, h: res.h, removed: res.removed, body: a(10, 10), hole: a(res.w / 2, res.h / 2) };
+    });
+    assert.ok(Math.abs(r.w - 184) <= 4 && Math.abs(r.h - 124) <= 4, `应该裁掉四周的背景：${r.w}×${r.h}`);
+    assert.ok(r.removed > 0.55, `背景被去掉的比例 ${r.removed}`);
+    assert.equal(r.body, 255);
+    assert.equal(r.hole, 255, '主体内部和背景同色的区域不应该被抠掉');
+    await context.close();
+});
+
+test('智能抠图：真实照片里识别出主体（人像、物品），背景变透明', async () => {
+    const { page, context, errors } = await open();
+    for (const [name, inside] of [['astronaut', [0.45, 0.25]], ['coffee', [0.5, 0.5]]]) {
+        const url = 'data:image/jpeg;base64,' + fs.readFileSync(path.join(ROOT, 'tests/fixtures', name + '.jpg')).toString('base64');
+        const r = await page.evaluate(async ({ u, at }) => {
+            const res = await Studio.aiCutout(u, 50);
+            const im = new Image();
+            im.src = res.url;
+            await im.decode();
+            const c = new OffscreenCanvas(res.w, res.h);
+            const g = c.getContext('2d');
+            g.drawImage(im, 0, 0);
+            const d = g.getImageData(0, 0, res.w, res.h).data;
+            // 按原图里的相对位置取透明度（裁掉的部分算全透明）
+            const a = (fx, fy) => {
+                const x = Math.round(fx * (res.box.W - 1)) - res.box.x;
+                const y = Math.round(fy * (res.box.H - 1)) - res.box.y;
+                if (x < 0 || y < 0 || x >= res.w || y >= res.h) return 0;
+                return d[(y * res.w + x) * 4 + 3];
+            };
+            return { removed: res.removed, subject: a(at[0], at[1]), corner: a(0.98, 0.03) };
+        }, { u: url, at: inside });
+        assert.ok(r.removed > 0.2 && r.removed < 0.9, `${name}：去掉的比例 ${r.removed}`);
+        assert.ok(r.subject > 200, `${name}：主体应该保留（透明度 ${r.subject}）`);
+        assert.ok(r.corner < 30, `${name}：背景应该变透明（透明度 ${r.corner}）`);
+    }
+    assert.deepEqual(errors, []);
     await context.close();
 });
 

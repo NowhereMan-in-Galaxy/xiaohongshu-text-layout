@@ -80,13 +80,34 @@ const Render = (() => {
             case 'img': {
                 const im = images.get(b.src);
                 const cap = b.alt ? `<figcaption>${esc(b.alt)}</figcaption>` : '';
+                const al = b.align && b.align !== 'center' ? ` al-${b.align}` : '';
                 if (!im) {
-                    return `<figure class="blk fig missing"${dl}><div class="img-missing">图片加载失败</div>${cap}</figure>`;
+                    return `<figure class="blk fig missing${al}"${dl}><div class="img-missing">图片加载失败</div>${cap}</figure>`;
                 }
+                // 宽度取「设定的百分比」「原图宽度」「按页面高度能放下的宽度」三者中最小的，保证等比例且不超出页面
                 const ratio = (im.w / im.h).toFixed(5);
                 const capH = b.alt ? ' - 2.4em' : '';
-                const style = `aspect-ratio:${im.w}/${im.h};width:min(100%, ${im.w}px, calc((var(--body-h)${capH}) * ${ratio}))`;
-                return `<figure class="blk fig${b.alt ? ' has-cap' : ''}"${dl}><img src="${esc(im.url)}" alt="${esc(b.alt)}" style="${style}">${cap}</figure>`;
+                const style = `aspect-ratio:${im.w}/${im.h};width:min(${b.width || 100}%, ${im.w}px, calc((var(--body-h)${capH}) * ${ratio}))`;
+                return `<figure class="blk fig${b.alt ? ' has-cap' : ''}${al}"${dl}><img data-i="0" src="${esc(im.url)}" alt="${esc(b.alt)}" style="${style}">${cap}</figure>`;
+            }
+            case 'imgrow': {
+                // 多张图并排：每格的宽度按图片宽高比分配，这样所有图高度一样；整行高度不超过页面
+                const GAP = 20;
+                const hasCap = b.items.some((it) => it.alt);
+                const recs = b.items.map((it) => images.get(it.src));
+                const ratios = recs.map((im) => (im ? im.w / im.h : 1));
+                const sum = ratios.reduce((a, r) => a + r, 0);
+                const gaps = GAP * (b.items.length - 1);
+                const width = `min(100%, calc((var(--body-h)${hasCap ? ' - 2.4em' : ''}) * ${sum.toFixed(5)} + ${gaps}px))`;
+                const cells = b.items.map((it, i) => {
+                    const im = recs[i];
+                    const pic = im
+                        ? `<img data-i="${i}" src="${esc(im.url)}" alt="${esc(it.alt)}" style="aspect-ratio:${im.w}/${im.h}">`
+                        : '<div class="img-missing" style="aspect-ratio:1">图片加载失败</div>';
+                    const cap = hasCap ? `<figcaption>${esc(it.alt) || '&nbsp;'}</figcaption>` : '';
+                    return `<div class="cell" style="flex:${ratios[i].toFixed(5)} 1 0">${pic}${cap}</div>`;
+                }).join('');
+                return `<figure class="blk fig row"${dl}><div class="row-in" style="width:${width};gap:${GAP}px">${cells}</div></figure>`;
             }
             case 'hr':
                 return `<div class="blk hr"${dl}><i></i><i></i><i></i></div>`;
@@ -155,7 +176,6 @@ const Render = (() => {
                 ${c.badge.trim() ? `<div class="cv-badge">${esc(c.badge.trim())}</div>` : ''}
                 <div class="cv-title">${coverTitleHtml(s, doc)}</div>
                 ${c.subtitle.trim() ? `<div class="cv-sub">${parseInline(c.subtitle.trim())}</div>` : ''}
-                ${c.sticker.trim() ? `<div class="cv-sticker">${esc(c.sticker.trim())}</div>` : ''}
                 <div class="cv-meta"><span>${esc(wm)}</span><span>${total > 1 ? `共 ${total} 页 · 左滑阅读 →` : ''}</span></div>
             </div>`);
         return el;

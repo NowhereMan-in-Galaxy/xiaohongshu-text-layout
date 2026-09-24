@@ -1,7 +1,8 @@
 // 运行：npm test （或 node --test tests/unit）
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parse, parseInline, adjustBreak, safeImageSrc } = require('../../js/markdown.js');
+const Markdown = require('../../js/markdown.js');
+const { parse, parseInline, adjustBreak, safeImageSrc } = Markdown;
 
 const types = (src) => parse(src).blocks.map((b) => b.type);
 
@@ -130,4 +131,21 @@ test('断行：前一页不以左括号结尾', () => {
     const text = '这是一个「引号」例子';
     const k = text.indexOf('引');
     assert.equal(adjustBreak(text, k), k - 1);
+});
+
+test('图片行：宽度、对齐、同一行多张图并排', () => {
+    const { imageLine, formatImages } = Markdown;
+    assert.deepEqual(imageLine('![猫](img:a){40% left}'), [{ src: 'img:a', alt: '猫', width: 40, align: 'left' }]);
+    assert.deepEqual(imageLine('![](img:a){右}')[0].align, 'right');
+    assert.equal(imageLine('![](img:a){5%}')[0].width, 10, '宽度最小 10%');
+    assert.equal(imageLine('![](img:a) ![](img:b)').length, 2);
+    assert.equal(imageLine('文字 ![](img:a)'), null, '混着文字的不是图片行');
+    assert.equal(imageLine('![](img:a) ![](javascript:x)'), null, '有不安全的地址就整行不当图片');
+    const line = '![猫](img:a){55% right} ![](img:b)';
+    assert.equal(formatImages(imageLine(line)), line, '写回去和原来一样');
+    assert.equal(formatImages([{ src: 'img:a', alt: '', width: 100, align: 'center' }]), '![](img:a)', '默认值不写出来');
+
+    const blocks = Markdown.parse('![](img:a) ![](img:b)\n![](img:c){50%}').blocks;
+    assert.deepEqual(blocks.map((b) => b.type), ['imgrow', 'img']);
+    assert.equal(Markdown.parse('![](img:a) ![](img:b)\n![](img:c)').stats.images, 3);
 });
