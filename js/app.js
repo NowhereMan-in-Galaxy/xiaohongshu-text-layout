@@ -667,6 +667,9 @@
         state.draftId = Store.drafts.newId();
         state.text = text;
         state.settings = mergeSettings({ ...state.settings, cover: { ...state.settings.cover, title: '', subtitle: '', badge: '' } });
+        // 新草稿一律从长文模式开始
+        state.mode = 'long';
+        syncMode();
         state.longStk = [];
         state.freeStk = [];
         state.freePages = 1;

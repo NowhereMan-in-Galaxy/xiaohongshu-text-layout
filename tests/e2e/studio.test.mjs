@@ -525,8 +525,9 @@ test('文字和线条：输入文字、改样式，拖端点改长度和方向�
     await context.close();
 });
 
-test('自由排版：切换模式、换画布、加图片和手帐素材、管理页面，导出一致，刷新后还在，长文不受影响', async () => {
+test('自由排版：默认是长文，切换模式、换画布、加图片和手帐素材、管理页面，导出一致，刷新后还在，长文不受影响', async () => {
     const { page, context, errors } = await open();
+    assert.equal(await page.evaluate(() => Studio.state.mode), 'long', '第一次打开默认是长文模式');
     const longText = await page.evaluate(() => Studio.state.text);
     const longStickers = await page.evaluate(() => Studio.state.stickers.length);
 
@@ -603,6 +604,13 @@ test('自由排版：切换模式、换画布、加图片和手帐素材、管�
     await page.locator('#modeSeg [data-mode="free"]').click();
     await page.locator('#viewSeg [data-view="phone"]').click();
     await page.waitForFunction(() => document.querySelector('#phoneView .pg.canvas'));
+    await page.locator('#viewSeg [data-view="grid"]').click();
+
+    // 新建草稿默认是长文模式
+    await page.locator('#draftBtn').click();
+    await page.locator('#draftMenu [data-act="new"]').click();
+    await page.waitForFunction(() => Studio.state.mode === 'long' && !Studio.state.model.free);
+    assert.ok(await page.locator('#editor').isVisible());
     assert.deepEqual(errors, []);
     await context.close();
 });
