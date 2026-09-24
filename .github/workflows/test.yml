@@ -1,0 +1,36 @@
+# 自动测试：每次往 main 推送代码、或者有人开 Pull Request 时，GitHub 会自动运行这里的步骤。
+# 结果会显示在 PR 页面底部（绿色 ✓ 表示通过，红色 ✗ 表示有测试没过）。
+name: 测试
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 单元测试（Markdown 解析、断行规则）
+        run: npm test
+
+      - name: 安装浏览器和中文字体
+        run: |
+          npx playwright install --with-deps chromium
+          sudo apt-get install -y fonts-noto-cjk
+
+      - name: 端到端测试（真实浏览器里的分页和导出）
+        run: npm run test:e2e
