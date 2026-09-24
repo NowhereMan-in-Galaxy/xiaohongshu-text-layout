@@ -19,7 +19,7 @@ const Themes = (() => {
             + '</span></div>',
         tool: '<div class="ios-tool">'
             + SVG(56, 56, '<circle cx="28" cy="28" r="25"/><path d="M16 29l8 8 16-17"/>')
-            + SVG(56, 56, '<path d="M40 22L24.5 37.5a6 6 0 0 1-8.5-8.5L33 12a10 10 0 0 1 14 14L29 44a14 14 0 0 1-20-20L24 9"/>')
+            + SVG(60, 56, '<path d="M6 18a4 4 0 0 1 4-4h8l4-6h16l4 6h8a4 4 0 0 1 4 4v26a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4z"/><circle cx="30" cy="30" r="9"/>')
             + SVG(56, 56, '<circle cx="28" cy="28" r="25"/><path d="M20 40l3-9 14-14a4 4 0 0 1 6 6L29 37z"/>')
             + SVG(56, 56, '<path d="M26 9H10a4 4 0 0 0-4 4v33a4 4 0 0 0 4 4h33a4 4 0 0 0 4-4V30"/><path d="M22 34l2-9L45 4a4.2 4.2 0 0 1 6 6L30 31z"/>')
             + '</div><i class="ios-home"></i>',
@@ -31,6 +31,13 @@ const Themes = (() => {
     };
 
     const list = [
+        {
+            id: 'grid',
+            name: '学习笔记',
+            desc: '方格纸 + 荧光笔，学霸同款',
+            accents: ['#2f6feb', '#e5484d', '#12a150', '#7c4dff', '#f76b15', '#1d1d1f'],
+            swatch: ['#ffffff', '#2f6feb'],
+        },
         {
             id: 'memo',
             name: '备忘录',
@@ -55,15 +62,6 @@ const Themes = (() => {
             desc: '干净克制，干货清单首选',
             accents: ['#ff2442', '#1d1d1f', '#2f6feb', '#0f9d58', '#ff7a00', '#8e44ef'],
             swatch: ['#ffffff', '#ff2442'],
-        },
-        {
-            id: 'grid',
-            name: '学习笔记',
-            desc: '方格纸 + 荧光笔，学霸同款',
-            accents: ['#2f6feb', '#e5484d', '#12a150', '#7c4dff', '#f76b15', '#1d1d1f'],
-            swatch: ['#ffffff', '#2f6feb'],
-            deco: '<i class="clip"></i>',
-            coverDeco: '<i class="clip"></i>',
         },
         {
             id: 'magazine',

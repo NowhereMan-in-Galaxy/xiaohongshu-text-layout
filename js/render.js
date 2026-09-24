@@ -158,6 +158,26 @@ const Render = (() => {
         return el;
     }
 
+    /**
+     * 自由排版模式的一页：只有画布背景和页脚（署名、页码），内容全是自由摆放的贴纸
+     * @param {object} s 设置（用 s.canvas 和 s.canvasAccent）
+     */
+    function canvasShell(s, opt = {}) {
+        const cv = Canvases.get(s.canvas);
+        const [w, h] = size(s.ratio);
+        const el = document.createElement('div');
+        el.className = ['pg', 'canvas', 'canvas-' + cv.id, w > h ? 'r-wide' : ''].filter(Boolean).join(' ');
+        const accent = s.canvasAccent || cv.accents[0];
+        const vars = { ...pageStyle(s), '--accent': accent, '--accent-ink': inkOn(accent) };
+        for (const [k, v] of Object.entries(vars)) el.style.setProperty(k, v);
+        let html = `<div class="pg-bg"></div><div class="pg-deco">${cv.deco || ''}</div>`;
+        const wm = s.watermark.trim() ? `<span class="pg-wm">${esc(s.watermark.trim())}</span>` : '';
+        const num = s.pageNum ? `<span class="pg-num">${numText(opt.index || 0, opt.total || 1)}</span>` : '';
+        if (wm || num) html += `<div class="pg-footer">${wm}${num}</div>`;
+        el.innerHTML = html;
+        return el;
+    }
+
     /* ---------------------------------------------------------------- 封面 */
 
     function coverTitleHtml(s, doc) {
@@ -208,5 +228,5 @@ const Render = (() => {
         return best;
     }
 
-    return { RATIOS, size, blockHtml, shell, coverShell, fitCover, numText, inkOn };
+    return { RATIOS, size, blockHtml, shell, canvasShell, coverShell, fitCover, numText, inkOn };
 })();
