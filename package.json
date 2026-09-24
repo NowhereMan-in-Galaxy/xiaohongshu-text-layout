@@ -1,0 +1,16 @@
+{
+  "name": "xiaohongshu-text-layout",
+  "version": "2.0.0",
+  "private": true,
+  "description": "长文卡片工作室：把长文自动排成小红书图片卡片（纯静态网页，无需构建）",
+  "license": "MIT",
+  "scripts": {
+    "start": "http-server -c-1 -p 8080 .",
+    "test": "node --test 'tests/unit/*.test.js'",
+    "test:e2e": "node --test --test-concurrency=1 'tests/e2e/*.test.mjs'"
+  },
+  "devDependencies": {
+    "http-server": "14.1.1",
+    "playwright": "1.56.1"
+  }
+}
