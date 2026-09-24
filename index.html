@@ -3,1295 +3,324 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>小红书长文排版工具</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>长文卡片工作室 · 小红书长文排版</title>
+    <meta name="description" content="把长文自动排成一页页精美的小红书图片卡片：真实测量分页、9 套主题、自动封面、手机预览、一键导出。">
+    <meta name="theme-color" content="#ff2442">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23ff2442'/%3E%3Crect x='16' y='14' width='32' height='38' rx='5' fill='%23fff'/%3E%3Crect x='22' y='22' width='20' height='3.5' rx='1.7' fill='%23ff2442'/%3E%3Crect x='22' y='30' width='20' height='3' rx='1.5' fill='%23ffb3be'/%3E%3Crect x='22' y='37' width='14' height='3' rx='1.5' fill='%23ffb3be'/%3E%3C/svg%3E">
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-            background-color: #f5f5f5;
-            padding: 20px;
-        }
+    <!-- 网络字体（加载不了时会自动退回系统字体，不影响使用） -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" crossorigin="anonymous"
+        href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&family=ZCOOL+KuaiLe&family=Ma+Shan+Zheng&display=swap">
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
+    <link rel="stylesheet" href="css/app.css">
+    <link rel="stylesheet" href="css/pages.css">
 
-        h1 {
-            text-align: center;
-            color: #333;
-            margin-bottom: 30px;
-        }
-
-        .main-content {
-            display: flex;
-            gap: 30px;
-            align-items: flex-start;
-        }
-
-        .input-section {
-            flex: 1;
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-
-        .output-section {
-            flex: 1;
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-
-        textarea {
-            width: 100%;
-            min-height: 300px;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 14px;
-            resize: vertical;
-        }
-
-        .controls {
-            margin-top: 20px;
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        button {
-            padding: 10px 20px;
-            background-color: #ff2442;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background-color 0.3s;
-        }
-
-        button:hover {
-            background-color: #e01f3d;
-        }
-
-        .secondary-btn {
-            background-color: #666;
-        }
-
-        .secondary-btn:hover {
-            background-color: #555;
-        }
-
-        .preview-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 20px;
-            justify-content: center;
-        }
-
-        .page-preview {
-            width: 300px;
-            height: 533px;
-            background: white;
-            border: 1px solid #ddd;
-            overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            position: relative;
-        }
-
-        .page-content {
-            padding: 0;
-            margin: 0;
-            font-size: 14px;
-            line-height: 1.8;
-            color: #333;
-            word-wrap: break-word;
-            word-break: break-all;
-            overflow: hidden;
-        }
-
-        .page-content p {
-            margin: 0;
-            text-align: justify;
-            word-break: break-all;
-        }
-
-        .page-number {
-            position: absolute;
-            bottom: 15px;
-            right: 20px;
-            color: #999;
-            font-size: 12px;
-        }
-
-        .watermark {
-            position: absolute;
-            bottom: 15px;
-            left: 20px;
-            color: #ccc;
-            font-size: 12px;
-        }
-
-        .settings {
-            margin-top: 20px;
-            padding: 15px;
-            background: #f9f9f9;
-            border-radius: 5px;
-        }
-
-        .setting-item {
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        label {
-            min-width: 100px;
-            font-size: 14px;
-        }
-
-        input[type="number"],
-        input[type="text"] {
-            padding: 5px 10px;
-            border: 1px solid #ddd;
-            border-radius: 3px;
-            width: 200px;
-        }
-
-        .download-section {
-            margin-top: 20px;
-            text-align: center;
-        }
-
-        #canvas {
-            display: none;
-        }
-
-        .tips {
-            margin-top: 20px;
-            padding: 15px;
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            border-radius: 5px;
-            font-size: 13px;
-            color: #856404;
-        }
-
-        .editor-toolbar {
-            margin-bottom: 10px;
-            padding: 10px;
-            background: #f8f9fa;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            display: flex;
-            gap: 5px;
-            flex-wrap: wrap;
-        }
-
-        .toolbar-btn {
-            padding: 5px 10px;
-            background: #6c757d;
-            color: white;
-            border: none;
-            border-radius: 3px;
-            cursor: pointer;
-            font-size: 12px;
-            transition: background-color 0.3s;
-        }
-
-        .toolbar-btn:hover {
-            background: #5a6268;
-        }
-
-        .color-selector {
-            display: flex;
-            gap: 3px;
-            margin-left: 10px;
-        }
-
-        .color-btn {
-            width: 20px;
-            height: 20px;
-            border: 1px solid #ccc;
-            border-radius: 3px;
-            cursor: pointer;
-        }
-
-        .markdown-preview {
-            margin-top: 10px;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            background: #f9f9f9;
-            font-size: 12px;
-            max-height: 100px;
-            overflow-y: auto;
-        }
-
-        .page-header {
-            padding: 15px 25px 0;
-            font-weight: bold;
-            color: #666;
-            border-bottom: 1px solid #eee;
-            margin-bottom: 10px;
-        }
-
-        .md-table {
-            border-collapse: collapse;
-            margin: 10px 0;
-            width: 100%;
-            font-size: 13px;
-            background: #fff;
-        }
-
-        .md-table th,
-        .md-table td {
-            border: 1px solid #ddd;
-            padding: 6px 10px;
-            text-align: left;
-        }
-
-        .md-table th {
-            background: #f5f5f5;
-            font-weight: bold;
-        }
-
-        .md-table tr:nth-child(even) td {
-            background: #fafafa;
-        }
-    </style>
-    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="lib/modern-screenshot.js" defer></script>
+    <script src="lib/jszip.min.js" defer></script>
+    <script src="js/markdown.js" defer></script>
+    <script src="js/themes.js" defer></script>
+    <script src="js/store.js" defer></script>
+    <script src="js/render.js" defer></script>
+    <script src="js/paginate.js" defer></script>
+    <script src="js/exporter.js" defer></script>
+    <script src="js/phone.js" defer></script>
+    <script src="js/app.js" defer></script>
 </head>
 
 <body>
-    <div class="container">
-        <h1>小红书长文排版工具</h1>
-
-        <div class="main-content">
-            <div class="input-section">
-                <h2>输入文本</h2>
-                <div class="editor-toolbar">
-                    <button class="toolbar-btn" onclick="insertHeading('#')" title="一级标题">H1</button>
-                    <button class="toolbar-btn" onclick="insertHeading('##')" title="二级标题">H2</button>
-                    <button class="toolbar-btn" onclick="insertHeading('###')" title="三级标题">H3</button>
-                    <button class="toolbar-btn" onclick="insertMarkdown('**', '**')" title="加粗">💪 加粗</button>
-                    <button class="toolbar-btn" onclick="insertMarkdown('*', '*')" title="斜体"><em>I</em> 斜体</button>
-                    <button class="toolbar-btn" onclick="insertMarkdown('__', '__')" title="下划线"><u>U</u> 下划线</button>
-                    <button class="toolbar-btn" onclick="insertMarkdown('~~', '~~')" title="删除线"><s>S</s> 删除线</button>
-                    <div class="color-selector">
-                        <div class="color-btn" style="background: #ff4757;" onclick="insertColor('#ff4757')" title="红色">
-                        </div>
-                        <div class="color-btn" style="background: #5352ed;" onclick="insertColor('#5352ed')" title="蓝色">
-                        </div>
-                        <div class="color-btn" style="background: #2ed573;" onclick="insertColor('#2ed573')" title="绿色">
-                        </div>
-                        <div class="color-btn" style="background: #ffa502;" onclick="insertColor('#ffa502')" title="橙色">
-                        </div>
-                        <div class="color-btn" style="background: #ff6348;" onclick="insertColor('#ff6348')"
-                            title="珊瑚色"></div>
-                        <div class="color-btn" style="background: #a55eea;" onclick="insertColor('#a55eea')" title="紫色">
-                        </div>
-                    </div>
-                </div>
-                <textarea id="inputText" placeholder="请输入您要排版的长文内容..."></textarea>
-                <div class="markdown-preview" id="markdownPreview" style="display:none;">
-                    <strong>预览：</strong><br>
-                    <div id="previewContent"></div>
-                </div>
-
-                <div class="settings">
-                    <div class="setting-item">
-                        <label>字体大小：</label>
-                        <input type="number" id="fontSize" value="13" min="12" max="20" title="设置字体大小"
-                            aria-label="字体大小">
-                        px
-                    </div>
-                    <div class="setting-item">
-                        <label>行高：</label>
-                        <input type="number" id="lineHeight" value="1.8" min="1.2" max="2.5" step="0.1" title="设置行高"
-                            aria-label="行高">
-                    </div>
-                    <div class="setting-item">
-                        <label>水印文字：</label>
-                        <input type="text" id="watermarkText" placeholder="输入水印文字（可选）" title="设置水印文字" aria-label="水印文字">
-                    </div>
-                    <div class="setting-item">
-                        <label>背景颜色：</label>
-                        <select id="bgColor" title="选择背景颜色" aria-label="背景颜色"
-                            style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 200px;">
-                            <option value="white">纯白</option>
-                            <option value="cream">米色</option>
-                            <option value="light-pink">淡粉色</option>
-                            <option value="light-blue">淡蓝色</option>
-                            <option value="light-green">淡绿色</option>
-                            <option value="light-yellow">淡黄色</option>
-                            <option value="light-purple">淡紫色</option>
-                            <option value="light-gray">淡灰色</option>
-                            <option value="gradient1">渐变粉</option>
-                            <option value="gradient2">渐变蓝</option>
-                            <option value="gradient3">渐变紫</option>
-                        </select>
-                    </div>
-                    <div class="setting-item">
-                        <label>纹理效果：</label>
-                        <select id="bgTexture" title="选择背景纹理" aria-label="背景纹理"
-                            style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 200px;">
-                            <option value="none">无</option>
-                            <option value="paper">纸张纹理</option>
-                            <option value="dots">点阵</option>
-                            <option value="lines">横线</option>
-                            <option value="grid">网格</option>
-                            <option value="notebook">笔记本</option>
-                            <option value="memo">便笺纹理</option>
-                        </select>
-                    </div>
-                    <div class="setting-item">
-                        <label>风格预设：</label>
-                        <select id="stylePreset" onchange="applyPreset()" title="选择风格预设" aria-label="风格预设"
-                            style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 200px;">
-                            <option value="custom">自定义</option>
-                            <option value="classic-memo">经典备忘录</option>
-                            <option value="modern-note">现代笔记</option>
-                            <option value="vintage-paper">复古纸张</option>
-                            <option value="minimal-clean">简约清新</option>
-                            <option value="warm-journal">温暖日记</option>
-                        </select>
-                    </div>
-                    <div class="setting-item">
-                        <label>图片比例：</label>
-                        <select id="aspectRatio" onchange="updatePreviewSize()" title="选择图片比例" aria-label="图片比例"
-                            style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 200px;">
-                            <option value="2:3">2:3 竖版</option>
-                            <option value="3:4">3:4 小红书推荐</option>
-                            <option value="1:1">1:1 正方形</option>
-                            <option value="4:3">4:3 横向</option>
-                            <option value="16:9">16:9 宽屏</option>
-                            <option value="9:16">9:16 竖屏</option>
-                            <option value="custom">自定义尺寸</option>
-                        </select>
-                    </div>
-                    <div class="setting-item" id="customSizeOptions" style="display:none;">
-                        <label>自定义宽度：</label>
-                        <input type="number" id="customWidth" value="900" min="300" max="2000"> px
-                        <label style="margin-left: 15px;">高度：</label>
-                        <input type="number" id="customHeight" value="1600" min="300" max="2000"> px
-                    </div>
-                    <div class="setting-item">
-                        <label>字体选择：</label>
-                        <select id="fontFamily" title="选择字体" aria-label="字体选择"
-                            style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 200px;">
-                            <option value="default">系统默认</option>
-                            <option value="SimHei">黑体</option>
-                            <option value="SimSun">宋体</option>
-                            <option value="KaiTi">楷体</option>
-                            <option value="Microsoft YaHei">微软雅黑</option>
-                            <option value="PingFang SC">苹方</option>
-                            <option value="Hiragino Sans GB">冬青黑体</option>
-                            <option value="Arial">Arial</option>
-                            <option value="Times New Roman">Times New Roman</option>
-                            <option value="custom">上传自定义字体</option>
-                        </select>
-                    </div>
-                    <div class="setting-item" id="customFontUpload" style="display:none;">
-                        <label>字体文件：</label>
-                        <input type="file" id="fontFile" accept=".ttf,.otf,.woff,.woff2"
-                            style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 200px;">
-                        <button type="button" onclick="loadCustomFont()" class="toolbar-btn"
-                            style="margin-left: 10px;">加载字体</button>
-                    </div>
-                    <div class="setting-item">
-                        <label>字体下载：</label>
-                        <button type="button" onclick="showFontDownloadInfo()" class="toolbar-btn">获取字体资源</button>
-                        <span style="font-size: 12px; color: #666; margin-left: 10px;">获取免费中文字体下载链接</span>
-                    </div>
-                    <div class="setting-item">
-                        <label>页眉设置：</label>
-                        <input type="checkbox" id="enableHeader" onchange="toggleHeaderOptions()" title="启用固定页眉"
-                            aria-label="启用固定页眉">
-                        <span>启用固定页眉</span>
-                    </div>
-                    <div class="setting-item" id="headerOptions" style="display:none;">
-                        <label>页眉文字：</label>
-                        <input type="text" id="headerText" placeholder="输入页眉文字"
-                            style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 200px;">
-                    </div>
-                    <div class="setting-item" id="headerStyleOptions" style="display:none;">
-                        <label>页眉样式：</label>
-                        <select id="headerStyle"
-                            style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; width: 200px;">
-                            <option value="center">居中</option>
-                            <option value="left">左对齐</option>
-                            <option value="right">右对齐</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="controls">
-                    <button onclick="generatePages()">生成排版</button>
-                    <button class="secondary-btn" onclick="togglePreview()">切换预览</button>
-                    <button class="secondary-btn" onclick="clearAll()">清空</button>
-                </div>
-
-                <div class="tips">
-                    <strong>使用提示：</strong>
-                    <ul style="margin-left: 20px; margin-top: 5px;">
-                        <li>输入文本后点击"生成排版"</li>
-                        <li>智能分页：系统自动分页，确保内容不覆盖水印和页码</li>
-                        <li>回车控制：使用回车控制段落间距和空白，多个回车创建更多空白</li>
-                        <li>内容保护：页面容量智能计算，避免内容超出范围</li>
-                        <li>支持Markdown格式：# 一级标题 ## 二级标题 ### 三级标题 **加粗** *斜体* __下划线__ [color:#ff0000]红色[/color]</li>
-                        <li>可使用工具栏快速添加格式，或手动编写Markdown</li>
-                        <li>标题功能：点击H1/H2/H3按钮快速添加标题，或手动输入#、##、###</li>
-                        <li>点击"切换预览"查看格式效果</li>
-                        <li>点击"下载当前页"可保存单张图片</li>
-                        <li>点击"下载所有页"可批量保存</li>
-                    </ul>
+    <div class="app" id="app" data-pane="editor">
+        <!-- 顶栏 -->
+        <header class="topbar">
+            <div class="brand">
+                <span class="logo" aria-hidden="true"></span>
+                <div class="brand-text">
+                    <b>长文卡片工作室</b>
+                    <small>小红书长文排版</small>
                 </div>
             </div>
 
-            <div class="output-section">
-                <h2>预览效果</h2>
-                <div id="previewContainer" class="preview-container"></div>
-                <div class="download-section" id="downloadSection" style="display: none;">
-                    <button onclick="downloadCurrentPage()">下载当前页</button>
-                    <button onclick="downloadAllPages()">下载所有页</button>
+            <div class="dropdown" id="draftDrop">
+                <button class="btn ghost" id="draftBtn" aria-haspopup="true" aria-expanded="false">
+                    <svg class="i" viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6z M14 3v6h6"/></svg>
+                    <span id="draftTitle">草稿</span>
+                    <svg class="i caret" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+                </button>
+                <div class="menu" id="draftMenu" hidden></div>
+            </div>
+
+            <div class="grow"></div>
+
+            <button class="btn icon" id="settingsToggle" title="样式设置" aria-label="样式设置">
+                <svg class="i" viewBox="0 0 24 24"><path d="M12 3a9 9 0 100 18c1.1 0 1.6-.8 1.6-1.6 0-.5-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.7-1.6 1.6-1.6H16a5 5 0 005-5C21 6.4 17 3 12 3z"/><circle cx="7.5" cy="11" r="1.3"/><circle cx="10.5" cy="7" r="1.3"/><circle cx="15.5" cy="7.5" r="1.3"/></svg>
+            </button>
+            <button class="btn icon" id="darkToggle" title="切换深色模式" aria-label="切换深色模式">
+                <svg class="i" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 019.5 4 8 8 0 1020 14.5z"/></svg>
+            </button>
+
+            <div class="dropdown export-group">
+                <button class="btn primary" id="exportAll">
+                    <svg class="i" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+                    <span>导出全部</span>
+                </button>
+                <button class="btn primary more" id="exportMore" aria-haspopup="true" aria-label="更多导出方式">
+                    <svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+                </button>
+                <div class="menu right" id="exportMenu" hidden>
+                    <button data-act="zip">下载全部（ZIP 压缩包）</button>
+                    <button data-act="each">逐张下载全部 PNG</button>
+                    <button data-act="current">下载选中的这一页</button>
+                    <button data-act="copy">复制选中页到剪贴板</button>
+                    <button data-act="share">分享 / 存到相册</button>
                 </div>
             </div>
-        </div>
+        </header>
+
+        <main class="workspace">
+            <!-- 编辑区 -->
+            <section class="pane editor-pane" aria-label="编辑">
+                <div class="toolbar" id="toolbar">
+                    <button data-cmd="h1" title="一级标题">H1</button>
+                    <button data-cmd="h2" title="二级标题">H2</button>
+                    <button data-cmd="h3" title="三级标题">H3</button>
+                    <span class="sep"></span>
+                    <button data-cmd="bold" title="加粗 (Ctrl/⌘+B)"><b>B</b></button>
+                    <button data-cmd="italic" title="斜体 (Ctrl/⌘+I)"><i>I</i></button>
+                    <button data-cmd="underline" title="下划线 (Ctrl/⌘+U)"><u>U</u></button>
+                    <button data-cmd="strike" title="删除线"><s>S</s></button>
+                    <button data-cmd="mark" title="荧光笔高亮 (Ctrl/⌘+E)" class="mark-btn">高亮</button>
+                    <div class="dropdown">
+                        <button data-cmd="colors" title="文字颜色" class="color-btn"><span class="color-dot"></span></button>
+                        <div class="menu color-menu" id="colorMenu" hidden></div>
+                    </div>
+                    <span class="sep"></span>
+                    <button data-cmd="ul" title="无序列表">
+                        <svg class="i" viewBox="0 0 24 24"><circle cx="5" cy="7" r="1.4"/><circle cx="5" cy="12" r="1.4"/><circle cx="5" cy="17" r="1.4"/><path d="M10 7h10M10 12h10M10 17h10"/></svg>
+                    </button>
+                    <button data-cmd="ol" title="有序列表">
+                        <svg class="i" viewBox="0 0 24 24"><path d="M4 5h1.5v4M4 9h3M4 14.5c0-1 .8-1.5 1.5-1.5s1.5.5 1.5 1.3c0 1.2-3 2-3 3.7h3M10 7h10M10 12h10M10 17h10"/></svg>
+                    </button>
+                    <button data-cmd="task" title="待办清单">
+                        <svg class="i" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="6" height="6" rx="1.5"/><path d="M4.8 16.5l1.5 1.5 3-3M13 7.5h7M13 16.5h7"/></svg>
+                    </button>
+                    <button data-cmd="quote" title="引用">
+                        <svg class="i" viewBox="0 0 24 24"><path d="M5 6v12M9 8h10M9 12h10M9 16h6"/></svg>
+                    </button>
+                    <button data-cmd="table" title="插入表格">
+                        <svg class="i" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M3.5 10h17M3.5 14.5h17M10 5v14"/></svg>
+                    </button>
+                    <button data-cmd="image" title="插入图片（也可以直接粘贴或拖进来）">
+                        <svg class="i" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M4 18l5-5 4 4 3-3 4 4"/></svg>
+                    </button>
+                    <button data-cmd="hr" title="分隔线">
+                        <svg class="i" viewBox="0 0 24 24"><circle cx="7" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="17" cy="12" r="1.3"/></svg>
+                    </button>
+                    <button data-cmd="pagebreak" title="分页符：从这里开始新的一页 (Ctrl/⌘+Enter)">
+                        <svg class="i" viewBox="0 0 24 24"><path d="M6 3v5h12V3M6 21v-5h12v5M3 12h2M8 12h2M13 12h2M18 12h3"/></svg>
+                    </button>
+                    <span class="grow"></span>
+                    <button data-cmd="help" title="语法速查" class="help-btn">?</button>
+                </div>
+
+                <textarea id="editor" spellcheck="false" autocomplete="off" aria-label="正文"
+                    placeholder="在这里写你的长文……&#10;&#10;# 一级标题会成为封面标题&#10;每一行是一个段落，写多长都行，会自动分页。"></textarea>
+
+                <div class="statusbar">
+                    <span id="stats"></span>
+                    <span id="saveState" class="muted"></span>
+                </div>
+            </section>
+
+            <!-- 预览区 -->
+            <section class="pane preview-pane" aria-label="预览">
+                <div class="preview-head">
+                    <div class="seg view-seg" id="viewSeg" aria-label="预览方式">
+                        <button data-view="grid" class="on">平铺</button>
+                        <button data-view="phone">手机预览</button>
+                    </div>
+                    <span id="pageInfo" class="muted"></span>
+                    <label class="zoom" title="缩放预览">
+                        <svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4M8.5 11h5"/></svg>
+                        <input type="range" id="zoom" min="180" max="520" step="10" value="300" aria-label="预览大小">
+                        <svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4M8.5 11h5M11 8.5v5"/></svg>
+                    </label>
+                </div>
+                <div class="grid" id="grid"></div>
+                <div class="phone-view" id="phoneView" hidden></div>
+            </section>
+
+            <!-- 设置区 -->
+            <aside class="pane settings-pane" id="settingsPane" aria-label="样式设置">
+                <div class="settings-close">
+                    <b>样式设置</b>
+                    <button class="btn icon" id="settingsClose" aria-label="关闭">
+                        <svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                    </button>
+                </div>
+
+                <section class="group">
+                    <h3>主题</h3>
+                    <div class="themes" id="themeList"></div>
+                </section>
+
+                <section class="group">
+                    <h3>强调色</h3>
+                    <div class="swatches" id="accentList"></div>
+                </section>
+
+                <section class="group">
+                    <h3>图片比例</h3>
+                    <div class="seg full" id="ratioSeg">
+                        <button data-v="3:4">3:4</button>
+                        <button data-v="2:3">2:3</button>
+                        <button data-v="9:16">9:16</button>
+                        <button data-v="1:1">1:1</button>
+                        <button data-v="4:3">4:3</button>
+                    </div>
+                </section>
+
+                <section class="group">
+                    <h3>文字</h3>
+                    <label class="row">字号 <output id="fontSizeOut"></output>
+                        <input type="range" id="fontSize" min="30" max="60" step="1">
+                    </label>
+                    <label class="row">行距 <output id="lineHeightOut"></output>
+                        <input type="range" id="lineHeight" min="1.3" max="2.3" step="0.05">
+                    </label>
+                    <label class="row">段距 <output id="paraSpacingOut"></output>
+                        <input type="range" id="paraSpacing" min="0" max="1.6" step="0.1">
+                    </label>
+                    <div class="row inline">
+                        <span>对齐</span>
+                        <div class="seg" id="alignSeg">
+                            <button data-v="justify">两端对齐</button>
+                            <button data-v="left">左对齐</button>
+                        </div>
+                    </div>
+                    <label class="row inline switch">
+                        <span>首行缩进两字</span>
+                        <input type="checkbox" id="indent">
+                    </label>
+                </section>
+
+                <section class="group">
+                    <h3>字体</h3>
+                    <label class="row inline">正文
+                        <select id="bodyFont">
+                            <option value="theme">跟随主题</option>
+                            <option value="sans">黑体</option>
+                            <option value="serif">宋体</option>
+                            <option value="kai">楷体</option>
+                            <option value="round">圆体 / 快乐体</option>
+                            <option value="custom">自定义字体</option>
+                        </select>
+                    </label>
+                    <label class="row inline">标题
+                        <select id="headFont">
+                            <option value="theme">跟随主题</option>
+                            <option value="same">和正文相同</option>
+                            <option value="sans">黑体</option>
+                            <option value="serif">宋体</option>
+                            <option value="kai">楷体</option>
+                            <option value="round">圆体 / 快乐体</option>
+                            <option value="brush">毛笔字</option>
+                            <option value="custom">自定义字体</option>
+                        </select>
+                    </label>
+                    <div class="row inline">
+                        <span class="muted small" id="fontName">没有上传自定义字体</span>
+                        <button class="btn small" id="fontUpload">上传字体</button>
+                    </div>
+                </section>
+
+                <section class="group">
+                    <h3>
+                        封面
+                        <label class="switch"><input type="checkbox" id="coverOn"></label>
+                    </h3>
+                    <div id="coverFields">
+                        <label class="row">标题
+                            <textarea id="coverTitle" rows="2" placeholder="留空则使用文中第一个 # 标题&#10;可以换行，也可以用 ==高亮== 和 **加粗**"></textarea>
+                        </label>
+                        <label class="row">副标题
+                            <input type="text" id="coverSub" placeholder="一句话说明看完能得到什么">
+                        </label>
+                        <label class="row">角标
+                            <input type="text" id="coverBadge" placeholder="例如：干货 / 保姆级 / 建议收藏">
+                        </label>
+                        <div class="chips" id="badgeChips"></div>
+                        <div class="row">贴纸
+                            <div class="chips" id="stickerChips"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="group">
+                    <h3>页眉页脚</h3>
+                    <label class="row">页眉
+                        <input type="text" id="header" placeholder="每页顶部的小字（可选）">
+                    </label>
+                    <label class="row">署名 / 水印
+                        <input type="text" id="watermark" placeholder="例如 @你的小红书号">
+                    </label>
+                    <label class="row inline switch">
+                        <span>显示页码</span>
+                        <input type="checkbox" id="pageNum">
+                    </label>
+                </section>
+
+                <section class="group">
+                    <h3>导出</h3>
+                    <div class="seg full" id="scaleSeg">
+                        <button data-v="1">标准 1080px</button>
+                        <button data-v="2">高清 2160px</button>
+                    </div>
+                    <button class="btn small reset" id="resetStyle">恢复默认样式</button>
+                </section>
+            </aside>
+        </main>
+
+        <nav class="mobile-tabs" id="mobileTabs">
+            <button data-pane="editor" class="on">写作</button>
+            <button data-pane="preview">预览</button>
+            <button data-pane="settings">样式</button>
+        </nav>
     </div>
 
-    <canvas id="canvas"></canvas>
-
-    <script>
-        // 全局变量声明
-        let currentPages = [];
-        let currentPageIndex = 0;
-
-        // 恢复最初的分页函数：段落整体分页，不分行填满
-        function splitTextIntoPages(text) {
-            try {
-                const fontSize = parseInt(document.getElementById('fontSize').value) || 13;
-                const lineHeight = parseFloat(document.getElementById('lineHeight').value) || 1.8;
-                const enableHeader = document.getElementById('enableHeader').checked || false;
-                const aspectRatio = document.getElementById('aspectRatio').value || '2:3';
-                const dimensions = getAspectRatioDimensions(aspectRatio);
-
-                const pageHeight = dimensions.preview.height;
-                const pageWidth = dimensions.preview.width;
-
-                const padding = {
-                    top: 15,
-                    bottom: 20,
-                    left: 20,
-                    right: 20
-                };
-                const headerHeight = enableHeader ? 30 : 0;
-                const footerHeight = 30;
-                const availableHeight = pageHeight - padding.top - padding.bottom - headerHeight - footerHeight;
-                const availableWidth = pageWidth - padding.left - padding.right;
-                const lineHeightPx = fontSize * lineHeight;
-                const maxLinesPerPage = Math.max(1, Math.floor(availableHeight / lineHeightPx) - 1);
-                const charsPerLine = Math.floor(availableWidth / (fontSize * 0.9));
-
-                const paragraphs = text.split('\n');
-                // 处理每个段落，计算实际占用的行数
-                const processedParagraphs = paragraphs.map(paragraph => {
-                    if (paragraph.trim() === '') {
-                        // 空行占一行
-                        return {
-                            text: '',
-                            lines: 1,
-                            isEmptyLine: true
-                        };
-                    }
-                    // 移除Markdown标记来计算实际长度
-                    const plainText = paragraph
-                        .replace(/\*\*(.*?)\*\*/g, '$1')
-                        .replace(/\*(.*?)\*/g, '$1')
-                        .replace(/__(.*?)__/g, '$1')
-                        .replace(/~~(.*?)~~/g, '$1')
-                        .replace(/\[color:#[a-fA-F0-9]{6}\](.*?)\[\/color\]/g, '$1');
-                    // 计算这个段落需要多少行
-                    const linesNeeded = Math.ceil(plainText.length / charsPerLine) || 1;
-                    return {
-                        text: paragraph,
-                        lines: linesNeeded,
-                        isEmptyLine: false
-                    };
-                });
-                // 分页
-                const pages = [];
-                let currentPage = [];
-                let currentPageLines = 0;
-                for (let i = 0; i < processedParagraphs.length; i++) {
-                    const paragraph = processedParagraphs[i];
-                    // 检查当前段落是否能放入当前页
-                    if (currentPageLines + paragraph.lines > maxLinesPerPage && currentPage.length > 0) {
-                        // 当前页已满，创建新页
-                        pages.push(currentPage.map(p => p.text));
-                        currentPage = [paragraph];
-                        currentPageLines = paragraph.lines;
-                    } else {
-                        // 添加到当前页
-                        currentPage.push(paragraph);
-                        currentPageLines += paragraph.lines;
-                    }
-                }
-                // 添加最后一页
-                if (currentPage.length > 0) {
-                    pages.push(currentPage.map(p => p.text));
-                }
-                if (pages.length === 0) {
-                    pages.push(['']);
-                }
-                return pages;
-            } catch (error) {
-                console.error('分页错误:', error);
-                return [['']];
-            }
-        }
-
-        function parseMarkdown(text) {
-            // 1. 先整体识别所有表格块，替换为唯一占位符
-            let tableMap = {};
-            let tableIdx = 0;
-            text = text.replace(/((?:^\s*\|.*\|.*(?:\n|$))+)/gm, function (tableBlock) {
-                const lines = tableBlock.trim().split('\n');
-                if (lines.length < 2) return tableBlock;
-                if (!/^\s*\|?\s*(:?-+:?\s*\|)+\s*$/.test(lines[1])) return tableBlock;
-                const key = `__TABLE_BLOCK_${tableIdx}__`;
-                tableMap[key] = tableBlock;
-                tableIdx++;
-                return key;
-            });
-            // 2. 其它Markdown处理
-            text = text
-                // 处理标题 (必须在其他格式之前处理)
-                .replace(/^### (.*$)/gim, '<h3 style="margin: 0; margin-bottom: 0.3em; font-size: 0.9em; font-weight: bold; color: #333;">$1</h3>')
-                .replace(/^## (.*$)/gim, '<h2 style="margin: 0; margin-bottom: 0.3em; font-size: 1.1em; font-weight: bold; color: #333;">$1</h2>')
-                .replace(/^# (.*$)/gim, '<h1 style="margin: 0; margin-bottom: 0.3em; font-size: 1.2em; font-weight: bold; color: #333;">$1</h1>')
-                // 处理其他格式
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                .replace(/__(.*?)__/g, '<u>$1</u>')
-                .replace(/~~(.*?)~~/g, '<del>$1</del>')
-                .replace(/\[color:(#[a-fA-F0-9]{6})\](.*?)\[\/color\]/g, '<span style="color:$1">$2</span>');
-            // 3. 替换回表格HTML
-            Object.keys(tableMap).forEach(key => {
-                text = text.replace(key, renderMarkdownTable(tableMap[key].split('\n')));
-            });
-            return text;
-        }
-
-        // 渲染Markdown表格为HTML
-        function renderMarkdownTable(lines) {
-            if (lines.length < 2) return lines.join('<br>');
-            const headerCells = lines[0].split('|').slice(1, -1).map(cell => cell.trim());
-            const rows = lines.slice(2).map(row => row.split('|').slice(1, -1).map(cell => cell.trim()));
-            let html = '<table class="md-table"><thead><tr>';
-            headerCells.forEach(cell => { html += `<th>${parseMarkdown(cell)}</th>`; });
-            html += '</tr></thead><tbody>';
-            rows.forEach(row => {
-                html += '<tr>';
-                row.forEach(cell => { html += `<td>${parseMarkdown(cell)}</td>`; });
-                html += '</tr>';
-            });
-            html += '</tbody></table>';
-            return html;
-        }
-
-        // 改进的格式化文本函数
-        function formatTextWithParagraphs(lines) {
-            return lines.map((line, index) => {
-                if (line.trim() === '') {
-                    // 空行保持固定高度，但减少高度
-                    return '<p style="margin: 0; height: 0.5em;">&nbsp;</p>';
-                } else {
-                    // 检查是否是标题
-                    const isHeading = /^#{1,3}\s/.test(line);
-
-                    if (isHeading) {
-                        // 标题不需要额外的包装
-                        return parseMarkdown(line);
-                    } else {
-                        // 正常段落，减少段落间距
-                        const marginBottom = index === lines.length - 1 ? '0' : '0.3em';
-                        return `<p style="margin: 0; margin-bottom: ${marginBottom}; text-align: justify; word-break: break-all;">${parseMarkdown(line)}</p>`;
-                    }
-                }
-            }).join('');
-        }
-
-        function getBackgroundColor(colorOption) {
-            switch (colorOption) {
-                case 'cream': return '#FFF8E7';
-                case 'light-pink': return '#FDF2F8';
-                case 'light-blue': return '#EFF6FF';
-                case 'light-green': return '#F0FDF4';
-                case 'light-yellow': return '#FEFCE8';
-                case 'light-purple': return '#FAF5FF';
-                case 'light-gray': return '#F9FAFB';
-                case 'gradient1': return 'linear-gradient(135deg, #FFE0EC 0%, #FFF5E0 100%)';
-                case 'gradient2': return 'linear-gradient(135deg, #E0F0FF 0%, #F0E0FF 100%)';
-                case 'gradient3': return 'linear-gradient(135deg, #F5E0FF 0%, #E0E8FF 100%)';
-                default: return 'white';
-            }
-        }
-
-        function getTextureOverlay(textureOption) {
-            switch (textureOption) {
-                case 'paper':
-                    return 'repeating-linear-gradient(123deg, transparent, transparent 2px, rgba(0,0,0,0.008) 2px, rgba(0,0,0,0.008) 3px), repeating-linear-gradient(27deg, transparent, transparent 1px, rgba(0,0,0,0.005) 1px, rgba(0,0,0,0.005) 2px), radial-gradient(circle at 20% 50%, rgba(0,0,0,0.01) 0%, transparent 50%), radial-gradient(circle at 80% 30%, rgba(0,0,0,0.01) 0%, transparent 50%)';
-                case 'dots':
-                    return 'radial-gradient(circle at 10px 10px, rgba(0,0,0,0.1) 1px, transparent 0), radial-gradient(circle at 10px 10px, rgba(0,0,0,0.1) 1px, transparent 0)';
-                case 'lines':
-                    return 'repeating-linear-gradient(0deg, transparent, transparent 23px, rgba(0,0,0,0.1) 24px)';
-                case 'grid':
-                    return 'repeating-linear-gradient(0deg, transparent, transparent 19px, rgba(0,0,0,0.05) 20px), repeating-linear-gradient(90deg, transparent, transparent 19px, rgba(0,0,0,0.05) 20px)';
-                case 'notebook':
-                    return 'repeating-linear-gradient(0deg, transparent, transparent 23px, rgba(0,0,0,0.1) 24px), linear-gradient(90deg, #ff69b4 80px, #ff69b4 82px, transparent 82px)';
-                case 'memo':
-                    return 'linear-gradient(45deg, rgba(255,255,255,0.1) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.1) 75%), linear-gradient(-45deg, rgba(255,255,255,0.1) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.1) 75%)';
-                default:
-                    return null;
-            }
-        }
-
-        function applyBackground(element, bgColor, bgTexture) {
-            const baseColor = getBackgroundColor(bgColor);
-            element.style.background = baseColor;
-
-            if (bgTexture !== 'none') {
-                const textureOverlay = getTextureOverlay(bgTexture);
-                if (textureOverlay) {
-                    element.style.background = textureOverlay + ', ' + baseColor;
-                    if (bgTexture === 'dots') {
-                        element.style.backgroundSize = '20px 20px, 20px 20px';
-                    } else if (bgTexture === 'memo') {
-                        element.style.backgroundSize = '10px 10px, 10px 10px';
-                    }
-                }
-            }
-        }
-
-        function applyPreset() {
-            const preset = document.getElementById('stylePreset').value;
-            const bgColorSelect = document.getElementById('bgColor');
-            const bgTextureSelect = document.getElementById('bgTexture');
-
-            switch (preset) {
-                case 'classic-memo':
-                    bgColorSelect.value = 'light-yellow';
-                    bgTextureSelect.value = 'lines';
-                    break;
-                case 'modern-note':
-                    bgColorSelect.value = 'white';
-                    bgTextureSelect.value = 'dots';
-                    break;
-                case 'vintage-paper':
-                    bgColorSelect.value = 'cream';
-                    bgTextureSelect.value = 'paper';
-                    break;
-                case 'minimal-clean':
-                    bgColorSelect.value = 'white';
-                    bgTextureSelect.value = 'none';
-                    break;
-                case 'warm-journal':
-                    bgColorSelect.value = 'light-pink';
-                    bgTextureSelect.value = 'memo';
-                    break;
-            }
-        }
-
-        function getAspectRatioDimensions(ratio) {
-            const previewBase = 300;
-            const downloadBase = 900;
-
-            switch (ratio) {
-                case '1:1':
-                    return {
-                        preview: { width: previewBase, height: previewBase },
-                        download: { width: downloadBase, height: downloadBase }
-                    };
-                case '3:4':
-                    return {
-                        preview: { width: previewBase, height: Math.round(previewBase * 4 / 3) },
-                        download: { width: downloadBase, height: Math.round(downloadBase * 4 / 3) }
-                    };
-                case '4:3':
-                    return {
-                        preview: { width: previewBase, height: Math.round(previewBase * 3 / 4) },
-                        download: { width: downloadBase, height: Math.round(downloadBase * 3 / 4) }
-                    };
-                case '16:9':
-                    return {
-                        preview: { width: previewBase, height: Math.round(previewBase * 9 / 16) },
-                        download: { width: downloadBase, height: Math.round(downloadBase * 9 / 16) }
-                    };
-                case '9:16':
-                    return {
-                        preview: { width: previewBase, height: Math.round(previewBase * 16 / 9) },
-                        download: { width: downloadBase, height: Math.round(downloadBase * 16 / 9) }
-                    };
-                case '2:3':
-                    return {
-                        preview: { width: previewBase, height: Math.round(previewBase * 3 / 2) },
-                        download: { width: downloadBase, height: Math.round(downloadBase * 3 / 2) }
-                    };
-                case 'custom':
-                    const customWidth = parseInt(document.getElementById('customWidth').value) || 900;
-                    const customHeight = parseInt(document.getElementById('customHeight').value) || 1600;
-                    const scale = previewBase / customWidth;
-                    return {
-                        preview: { width: previewBase, height: Math.round(customHeight * scale) },
-                        download: { width: customWidth, height: customHeight }
-                    };
-                default:
-                    return {
-                        preview: { width: previewBase, height: Math.round(previewBase * 3 / 2) },
-                        download: { width: downloadBase, height: Math.round(downloadBase * 3 / 2) }
-                    };
-            }
-        }
-
-        function updatePreviewSize() {
-            const aspectRatio = document.getElementById('aspectRatio').value;
-            const customOptions = document.getElementById('customSizeOptions');
-
-            customOptions.style.display = aspectRatio === 'custom' ? 'block' : 'none';
-
-            const pagePreviewElements = document.querySelectorAll('.page-preview');
-            const dimensions = getAspectRatioDimensions(aspectRatio);
-
-            pagePreviewElements.forEach(element => {
-                element.style.width = dimensions.preview.width + 'px';
-                element.style.height = dimensions.preview.height + 'px';
-            });
-
-            const inputText = document.getElementById('inputText').value;
-            if (inputText.trim() && currentPages.length > 0) {
-                generatePages();
-            }
-        }
-
-        function updateFontDisplay() {
-            const fontFamily = document.getElementById('fontFamily').value;
-            const customFontUpload = document.getElementById('customFontUpload');
-
-            customFontUpload.style.display = fontFamily === 'custom' ? 'block' : 'none';
-
-            const pageContentElements = document.querySelectorAll('.page-content');
-            pageContentElements.forEach(element => {
-                if (fontFamily === 'default') {
-                    element.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
-                } else if (fontFamily !== 'custom') {
-                    element.style.fontFamily = `"${fontFamily}", -apple-system, BlinkMacSystemFont, sans-serif`;
-                }
-            });
-        }
-
-        function regenerateIfNeeded() {
-            const inputText = document.getElementById('inputText').value;
-            if (inputText.trim() && currentPages.length > 0) {
-                generatePages();
-            }
-        }
-
-        function loadCustomFont() {
-            const fileInput = document.getElementById('fontFile');
-            const file = fileInput.files[0];
-
-            if (!file) {
-                alert('请选择字体文件');
-                return;
-            }
-
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                const fontData = e.target.result;
-                const fontFamily = 'CustomFont_' + Date.now();
-
-                const style = document.createElement('style');
-                style.textContent = `
-                    @font-face {
-                        font-family: "${fontFamily}";
-                        src: url(${fontData});
-                    }
-                `;
-                document.head.appendChild(style);
-
-                const pageContentElements = document.querySelectorAll('.page-content');
-                pageContentElements.forEach(element => {
-                    element.style.fontFamily = `"${fontFamily}", sans-serif`;
-                });
-
-                alert('字体加载成功！');
-            };
-
-            reader.readAsDataURL(file);
-        }
-
-        function showFontDownloadInfo() {
-            const fontInfo = `
-                <div style="max-width: 500px; text-align: left;">
-                    <h3>免费中文字体资源推荐：</h3>
-                    <br>
-                    <strong>1. 思源字体系列：</strong><br>
-                    • 思源黑体 (Source Han Sans)<br>
-                    • 思源宋体 (Source Han Serif)<br>
-                    • 下载地址：GitHub 搜索 "adobe-fonts"<br>
-                    <br>
-                    <strong>2. 站酷字体系列：</strong><br>
-                    • 站酷高端黑、站酷快乐体、站酷文艺体<br>
-                    • 下载地址：站酷网 (zcool.com.cn)<br>
-                    <br>
-                    <strong>3. 方正字库免费字体：</strong><br>
-                    • 方正黑体、方正楷体、方正仿宋<br>
-                    • 下载地址：方正字库官网<br>
-                    <br>
-                    <strong>4. 文泉驿字体：</strong><br>
-                    • 文泉驿微米黑、文泉驿正黑<br>
-                    • 下载地址：wenq.org<br>
-                    <br>
-                    <strong>使用说明：</strong><br>
-                    1. 下载字体文件(.ttf, .otf格式)<br>
-                    2. 在"字体选择"中选择"上传自定义字体"<br>
-                    3. 点击"选择文件"上传字体<br>
-                    4. 点击"加载字体"即可使用<br>
-                </div>
-            `;
-
-            const popup = document.createElement('div');
-            popup.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0,0,0,0.5);
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                z-index: 10000;
-            `;
-
-            const content = document.createElement('div');
-            content.style.cssText = `
-                background: white;
-                padding: 30px;
-                border-radius: 10px;
-                max-width: 600px;
-                max-height: 80vh;
-                overflow-y: auto;
-                position: relative;
-            `;
-
-            const closeBtn = document.createElement('button');
-            closeBtn.textContent = '关闭';
-            closeBtn.style.cssText = `
-                position: absolute;
-                top: 10px;
-                right: 15px;
-                background: #ff2442;
-                color: white;
-                border: none;
-                padding: 5px 10px;
-                border-radius: 3px;
-                cursor: pointer;
-            `;
-            closeBtn.onclick = () => document.body.removeChild(popup);
-
-            content.innerHTML = fontInfo;
-            content.appendChild(closeBtn);
-            popup.appendChild(content);
-            document.body.appendChild(popup);
-        }
-
-        function toggleHeaderOptions() {
-            const enableHeader = document.getElementById('enableHeader').checked;
-            const headerOptions = document.getElementById('headerOptions');
-            const headerStyleOptions = document.getElementById('headerStyleOptions');
-
-            headerOptions.style.display = enableHeader ? 'block' : 'none';
-            headerStyleOptions.style.display = enableHeader ? 'block' : 'none';
-        }
-
-        // 改进的生成页面函数
-        function generatePages() {
-            try {
-                const inputText = document.getElementById('inputText').value;
-
-                if (!inputText || !inputText.trim()) {
-                    alert('请输入要排版的文本');
-                    return;
-                }
-
-                const fontSize = document.getElementById('fontSize').value;
-                const lineHeight = document.getElementById('lineHeight').value;
-                const watermarkText = document.getElementById('watermarkText').value;
-                const bgColor = document.getElementById('bgColor').value;
-                const bgTexture = document.getElementById('bgTexture').value;
-                const fontFamily = document.getElementById('fontFamily').value;
-                const enableHeader = document.getElementById('enableHeader').checked;
-                const headerText = document.getElementById('headerText').value;
-                const headerStyle = document.getElementById('headerStyle').value;
-
-                currentPages = splitTextIntoPages(inputText);
-
-                const previewContainer = document.getElementById('previewContainer');
-                previewContainer.innerHTML = '';
-
-                const aspectRatio = document.getElementById('aspectRatio').value;
-                const dimensions = getAspectRatioDimensions(aspectRatio);
-
-                currentPages.forEach((pageTextArray, index) => {
-                    const pageDiv = document.createElement('div');
-                    pageDiv.className = 'page-preview';
-                    pageDiv.setAttribute('data-page-index', index);
-                    pageDiv.style.width = dimensions.preview.width + 'px';
-                    pageDiv.style.height = dimensions.preview.height + 'px';
-                    pageDiv.style.position = 'relative';
-                    pageDiv.style.overflow = 'hidden';
-                    applyBackground(pageDiv, bgColor, bgTexture);
-
-                    // 创建内容容器
-                    const contentWrapper = document.createElement('div');
-                    contentWrapper.style.cssText = `
-                        position: absolute;
-                        top: ${enableHeader && headerText.trim() ? '70px' : '30px'};
-                        left: 25px;
-                        right: 25px;
-                        bottom: 55px;
-                        overflow: hidden;
-                    `;
-
-                    // 添加页眉
-                    if (enableHeader && headerText.trim()) {
-                        const headerDiv = document.createElement('div');
-                        headerDiv.className = 'page-header';
-                        headerDiv.style.cssText = `
-                            position: absolute;
-                            top: 0;
-                            left: 0;
-                            right: 0;
-                            padding: 15px 25px;
-                            font-size: ${Math.max(parseInt(fontSize) - 2, 12)}px;
-                            font-weight: bold;
-                            color: #666;
-                            text-align: ${headerStyle};
-                            border-bottom: 1px solid #eee;
-                            background: rgba(255, 255, 255, 0.5);
-                        `;
-
-                        if (fontFamily === 'default') {
-                            headerDiv.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
-                        } else if (fontFamily !== 'custom') {
-                            headerDiv.style.fontFamily = `"${fontFamily}", -apple-system, BlinkMacSystemFont, sans-serif`;
-                        }
-
-                        headerDiv.textContent = headerText;
-                        pageDiv.appendChild(headerDiv);
-                    }
-
-                    // 添加内容
-                    const contentDiv = document.createElement('div');
-                    contentDiv.className = 'page-content';
-                    contentDiv.style.cssText = `
-                        font-size: ${fontSize}px;
-                        line-height: ${lineHeight};
-                        color: #333;
-                        word-wrap: break-word;
-                        word-break: break-all;
-                    `;
-
-                    if (fontFamily === 'default') {
-                        contentDiv.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
-                    } else if (fontFamily !== 'custom') {
-                        contentDiv.style.fontFamily = `"${fontFamily}", -apple-system, BlinkMacSystemFont, sans-serif`;
-                    }
-
-                    contentDiv.innerHTML = formatTextWithParagraphs(pageTextArray);
-                    contentWrapper.appendChild(contentDiv);
-                    pageDiv.appendChild(contentWrapper);
-
-                    // 添加页码
-                    const pageNumber = document.createElement('div');
-                    pageNumber.className = 'page-number';
-                    pageNumber.style.cssText = `
-                        position: absolute;
-                        bottom: 15px;
-                        right: 20px;
-                        color: #999;
-                        font-size: 12px;
-                    `;
-                    pageNumber.textContent = `${index + 1}/${currentPages.length}`;
-                    pageDiv.appendChild(pageNumber);
-
-                    // 添加水印
-                    if (watermarkText) {
-                        const watermark = document.createElement('div');
-                        watermark.className = 'watermark';
-                        watermark.style.cssText = `
-                            position: absolute;
-                            bottom: 15px;
-                            left: 20px;
-                            color: #ccc;
-                            font-size: 12px;
-                        `;
-                        watermark.textContent = watermarkText;
-                        pageDiv.appendChild(watermark);
-                    }
-
-                    // 点击选中效果
-                    pageDiv.onclick = () => {
-                        currentPageIndex = index;
-                        document.querySelectorAll('.page-preview').forEach(p => p.style.border = '1px solid #ddd');
-                        pageDiv.style.border = '2px solid #ff2442';
-                    };
-
-                    previewContainer.appendChild(pageDiv);
-                });
-
-                if (currentPages.length > 0) {
-                    document.getElementById('downloadSection').style.display = 'block';
-                }
-            } catch (error) {
-                console.error('生成页面错误:', error);
-                alert('生成页面时出现错误，请检查您的输入');
-            }
-        }
-
-        // html2canvas下载函数
-        function downloadPageByHtml2Canvas(pageIndex) {
-            const pageElement = document.querySelector(`[data-page-index="${pageIndex}"]`);
-            if (!pageElement) return;
-            html2canvas(pageElement, {
-                scale: 4, // 提高导出清晰度
-                useCORS: true
-            }).then(canvas => {
-                const url = canvas.toDataURL('image/png');
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `小红书排版_第${pageIndex + 1}页.png`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-            });
-        }
-
-        function downloadCurrentPage() {
-            downloadPageByHtml2Canvas(currentPageIndex);
-        }
-
-        function downloadAllPages() {
-            if (confirm(`确定要下载全部 ${currentPages.length} 页吗？`)) {
-                let delay = 0;
-                currentPages.forEach((_, index) => {
-                    setTimeout(() => downloadPageByHtml2Canvas(index), delay);
-                    delay += 800;
-                });
-            }
-        }
-
-        function clearAll() {
-            document.getElementById('inputText').value = '';
-            document.getElementById('previewContainer').innerHTML = '';
-            document.getElementById('downloadSection').style.display = 'none';
-            currentPages = [];
-            currentPageIndex = 0;
-        }
-
-        function insertHeading(level) {
-            const textarea = document.getElementById('inputText');
-            const start = textarea.selectionStart;
-            const end = textarea.selectionEnd;
-            const selectedText = textarea.value.substring(start, end);
-
-            // 获取当前行的内容
-            const lines = textarea.value.split('\n');
-            let currentLineIndex = 0;
-            let currentPos = 0;
-
-            for (let i = 0; i < lines.length; i++) {
-                if (currentPos <= start && start <= currentPos + lines[i].length) {
-                    currentLineIndex = i;
-                    break;
-                }
-                currentPos += lines[i].length + 1; // +1 for newline
-            }
-
-            if (selectedText) {
-                // 如果有选中的文本，将其转换为标题
-                const replacement = level + ' ' + selectedText;
-                textarea.value = textarea.value.substring(0, start) + replacement + textarea.value.substring(end);
-                textarea.selectionStart = start;
-                textarea.selectionEnd = start + replacement.length;
-            } else {
-                // 如果没有选中文本，在当前行开头插入标题格式
-                const currentLine = lines[currentLineIndex];
-                const lineStart = currentPos;
-                const lineEnd = lineStart + currentLine.length;
-
-                // 检查当前行是否已经是标题
-                if (currentLine.match(/^#{1,3}\s/)) {
-                    // 如果已经是标题，替换标题级别
-                    const newLine = level + ' ' + currentLine.replace(/^#{1,3}\s/, '');
-                    textarea.value = textarea.value.substring(0, lineStart) + newLine + textarea.value.substring(lineEnd);
-                    textarea.selectionStart = lineStart;
-                    textarea.selectionEnd = lineStart + newLine.length;
-                } else {
-                    // 如果不是标题，在行首添加标题格式
-                    const newLine = level + ' ' + currentLine;
-                    textarea.value = textarea.value.substring(0, lineStart) + newLine + textarea.value.substring(lineEnd);
-                    textarea.selectionStart = lineStart + level.length + 1;
-                    textarea.selectionEnd = lineStart + level.length + 1;
-                }
-            }
-            textarea.focus();
-            updatePreview();
-        }
-
-        function insertMarkdown(startTag, endTag) {
-            const textarea = document.getElementById('inputText');
-            const start = textarea.selectionStart;
-            const end = textarea.selectionEnd;
-            const selectedText = textarea.value.substring(start, end);
-
-            if (selectedText) {
-                const replacement = startTag + selectedText + endTag;
-                textarea.value = textarea.value.substring(0, start) + replacement + textarea.value.substring(end);
-                textarea.selectionStart = start;
-                textarea.selectionEnd = start + replacement.length;
-            } else {
-                const replacement = startTag + '请输入文字' + endTag;
-                textarea.value = textarea.value.substring(0, start) + replacement + textarea.value.substring(end);
-                textarea.selectionStart = start + startTag.length;
-                textarea.selectionEnd = start + startTag.length + 4;
-            }
-            textarea.focus();
-            updatePreview();
-        }
-
-        function insertColor(color) {
-            const textarea = document.getElementById('inputText');
-            const start = textarea.selectionStart;
-            const end = textarea.selectionEnd;
-            const selectedText = textarea.value.substring(start, end);
-
-            const startTag = `[color:${color}]`;
-            const endTag = '[/color]';
-
-            if (selectedText) {
-                const replacement = startTag + selectedText + endTag;
-                textarea.value = textarea.value.substring(0, start) + replacement + textarea.value.substring(end);
-                textarea.selectionStart = start;
-                textarea.selectionEnd = start + replacement.length;
-            } else {
-                const replacement = startTag + '请输入文字' + endTag;
-                textarea.value = textarea.value.substring(0, start) + replacement + textarea.value.substring(end);
-                textarea.selectionStart = start + startTag.length;
-                textarea.selectionEnd = start + startTag.length + 4;
-            }
-            textarea.focus();
-            updatePreview();
-        }
-
-        function togglePreview() {
-            const preview = document.getElementById('markdownPreview');
-            if (preview.style.display === 'none') {
-                preview.style.display = 'block';
-                updatePreview();
-            } else {
-                preview.style.display = 'none';
-            }
-        }
-
-        function updatePreview() {
-            const inputText = document.getElementById('inputText').value;
-            const previewContent = document.getElementById('previewContent');
-            const preview = document.getElementById('markdownPreview');
-
-            if (preview.style.display !== 'none') {
-                previewContent.innerHTML = parseMarkdown(inputText.replace(/\n/g, '<br>'));
-            }
-        }
-
-        // DOMContentLoaded 事件监听器
-        document.addEventListener('DOMContentLoaded', function () {
-            // 设置示例文本
-            const inputText = document.getElementById('inputText');
-            if (inputText) {
-                inputText.value = `# 小红书长文排版工具使用指南
-
-这是一个**示例文本**。小红书是一个生活方式分享平台，用户可以通过图片、视频和文字记录生活点滴，发现美好事物。
-
-## 平台特色
-
-在这个平台上，你可以找到各种*生活灵感*。从[color:#ff4757]美食制作[/color]到旅行攻略，从护肤心得到穿搭技巧，每个人都能在这里找到自己感兴趣的内容。
-
-### 创作者分享
-
-创作者们用心分享着自己的经验和见解。他们通过__精美的图片__和详细的文字，帮助其他用户解决生活中的各种问题。
-
-这种分享精神让小红书成为了一个充满正能量的社区。
-
-## 长文排版挑战
-
-对于长文创作者来说，如何将大段文字优雅地呈现在小红书上是一个~~挑战~~**机会**。
-
-### 解决方案
-
-这个工具就是为了解决这个问题而设计的。它会自动分页确保内容不会覆盖水印和页码。你可以用回车来控制段落间距，创造你想要的视觉效果。
-
-## 使用技巧
-
-• 使用标题按钮快速添加标题格式
-• 支持 **加粗**、*斜体*、__下划线__、~~删除线~~
-• 支持颜色标记：[color:#ff4757]红色文字[/color]
-• 自动分页，智能排版`;
-            }
-
-            // 设置事件监听器
-            const textarea = document.getElementById('inputText');
-            if (textarea) {
-                textarea.addEventListener('input', updatePreview);
-            }
-
-            const fontSelect = document.getElementById('fontFamily');
-            if (fontSelect) {
-                fontSelect.addEventListener('change', updateFontDisplay);
-            }
-
-            const fontSizeInput = document.getElementById('fontSize');
-            if (fontSizeInput) {
-                fontSizeInput.addEventListener('change', regenerateIfNeeded);
-            }
-
-            const lineHeightInput = document.getElementById('lineHeight');
-            if (lineHeightInput) {
-                lineHeightInput.addEventListener('change', regenerateIfNeeded);
-            }
-
-            // 延迟自动生成预览，确保所有元素都已加载
-            setTimeout(() => {
-                try {
-                    generatePages();
-                } catch (e) {
-                    console.error('自动生成预览失败:', e);
-                }
-            }, 500);
-        });
-    </script>
+    <div class="scrim" id="scrim" hidden></div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <dialog id="helpDialog" class="dialog">
+        <form method="dialog">
+            <h2>语法速查</h2>
+            <table class="cheats">
+                <tr><td><code># 标题</code></td><td>一级标题（第一个会用作封面标题）</td></tr>
+                <tr><td><code>## 标题</code> <code>### 标题</code></td><td>二级、三级标题</td></tr>
+                <tr><td><code>**加粗**</code></td><td><b>加粗</b></td></tr>
+                <tr><td><code>*斜体*</code></td><td><i>斜体</i></td></tr>
+                <tr><td><code>__下划线__</code></td><td><u>下划线</u></td></tr>
+                <tr><td><code>~~删除线~~</code></td><td><s>删除线</s></td></tr>
+                <tr><td><code>==高亮==</code></td><td><mark>荧光笔高亮</mark></td></tr>
+                <tr><td><code>[color:#e8804a]文字[/color]</code></td><td><span style="color:#e8804a">彩色文字</span></td></tr>
+                <tr><td><code>- 列表</code> <code>1. 列表</code></td><td>无序 / 有序列表，缩进两个空格变成子项</td></tr>
+                <tr><td><code>- [ ] 待办</code> <code>- [x] 完成</code></td><td>待办清单</td></tr>
+                <tr><td><code>&gt; 引用</code></td><td>引用块</td></tr>
+                <tr><td><code>| 表头 | 表头 |</code></td><td>表格，跨页时自动重复表头</td></tr>
+                <tr><td><code>```</code></td><td>代码块</td></tr>
+                <tr><td><code>![说明](图片)</code></td><td>图片，直接粘贴或拖进编辑框即可</td></tr>
+                <tr><td><code>***</code></td><td>装饰分隔线</td></tr>
+                <tr><td><code>---</code></td><td><b>分页符</b>：强制从下一页开始</td></tr>
+                <tr><td><code>#话题</code></td><td>话题标签，会用强调色显示</td></tr>
+                <tr><td>多按几次回车</td><td>每多一个空行，多一行留白</td></tr>
+            </table>
+            <button class="btn primary" value="close">知道了</button>
+        </form>
+    </dialog>
+
+    <input type="file" id="imageInput" accept="image/*" multiple hidden>
+    <input type="file" id="fontInput" accept=".ttf,.otf,.woff,.woff2" hidden>
 </body>
 
 </html>
