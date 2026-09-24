@@ -17,10 +17,10 @@
     /* ================================================================ 默认值 */
 
     const DEFAULTS = {
-        theme: 'memo',
+        theme: 'grid',
         accent: null,
         ratio: '3:4',
-        fontSize: 42,
+        fontSize: 36,
         lineHeight: 1.75,
         paraSpacing: 0.6,
         align: 'justify',

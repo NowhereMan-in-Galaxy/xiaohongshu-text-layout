@@ -32,6 +32,13 @@ const Themes = (() => {
 
     const list = [
         {
+            id: 'grid',
+            name: '学习笔记',
+            desc: '方格纸 + 荧光笔，学霸同款',
+            accents: ['#2f6feb', '#e5484d', '#12a150', '#7c4dff', '#f76b15', '#1d1d1f'],
+            swatch: ['#ffffff', '#2f6feb'],
+        },
+        {
             id: 'memo',
             name: '备忘录',
             desc: '像 iPhone 备忘录截图，真实感拉满',
@@ -55,15 +62,6 @@ const Themes = (() => {
             desc: '干净克制，干货清单首选',
             accents: ['#ff2442', '#1d1d1f', '#2f6feb', '#0f9d58', '#ff7a00', '#8e44ef'],
             swatch: ['#ffffff', '#ff2442'],
-        },
-        {
-            id: 'grid',
-            name: '学习笔记',
-            desc: '方格纸 + 荧光笔，学霸同款',
-            accents: ['#2f6feb', '#e5484d', '#12a150', '#7c4dff', '#f76b15', '#1d1d1f'],
-            swatch: ['#ffffff', '#2f6feb'],
-            deco: '<i class="clip"></i>',
-            coverDeco: '<i class="clip"></i>',
         },
         {
             id: 'magazine',

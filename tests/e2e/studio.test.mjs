@@ -260,8 +260,16 @@ async function fidelity(page, idx) {
         const da = read(a);
         const db = read(b);
         let diff = 0;
+        // 行距、段距是小数像素时，屏幕和导出对同一行的取整可能差 1px（肉眼看不出），
+        // 所以和上下相邻 1px 的像素比也算一致；换行不同、内容缺失这类真问题照样能查出来
+        const W = a.width;
+        const far = (k, o) => {
+            const j = k + o;
+            if (j < 0 || j >= db.length) return true;
+            return Math.abs(da[k] - db[j]) + Math.abs(da[k + 1] - db[j + 1]) + Math.abs(da[k + 2] - db[j + 2]) > 60;
+        };
         for (let k = 0; k < da.length; k += 4) {
-            if (Math.abs(da[k] - db[k]) + Math.abs(da[k + 1] - db[k + 1]) + Math.abs(da[k + 2] - db[k + 2]) > 60) diff++;
+            if (far(k, 0) && far(k, -4 * W) && far(k, 4 * W)) diff++;
         }
         const big = await createImageBitmap(await Studio.exportPage(i, 2));
         return { w: a.width, h: a.height, sw: b.width, sh: b.height, ratio: diff / (a.width * a.height), w2: big.width, h2: big.height };

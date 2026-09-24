@@ -961,7 +961,7 @@
 .theme-sticky .cv { top: 200px; bottom: 200px; }
 .theme-sticky .cv-meta { bottom: -80px; }
 
-/* 6. 学习笔记 —— 方格纸 + 荧光笔，学霸同款 */
+/* 6. 学习笔记 —— 方格纸 + 荧光笔，学霸同款（默认主题） */
 .theme-grid {
     --bg: #ffffff;
     --ink: #1f2a37;
@@ -1009,15 +1009,6 @@
 }
 
 .theme-grid .cv-title mark { --hl: rgba(255, 226, 0, 0.7); }
-.theme-grid .clip {
-    top: 40px;
-    left: 150px;
-    width: 64px;
-    height: 170px;
-    border: 9px solid #b9c3d1;
-    border-radius: 40px;
-    transform: rotate(8deg);
-}
 
 /* 7. 糖果卡片 —— 渐变背景上的一张白色圆角卡片 */
 .theme-candy {
