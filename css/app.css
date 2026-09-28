@@ -562,13 +562,24 @@ body:not(.mode-free) .free-only { display: none !important; }
 .fp-decos .stk.deco-prev {
     position: static;
     width: 100%;
-    max-width: 44px;
+    height: 100%;
+    display: grid;
+    place-items: center;
 }
 
 .fp-decos .deco-prev svg {
-    max-height: 44px;
+    width: 100%;
+    height: auto;
+    max-height: 48px;
     display: block;
     transform: none;
+}
+
+.fp-decos .fp-pack {
+    grid-column: 1 / -1;
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--ui-muted);
 }
 
 .fp-pages {

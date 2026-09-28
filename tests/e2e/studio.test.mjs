@@ -525,7 +525,7 @@ test('文字和线条：输入文字、改样式，拖端点改长度和方向�
     await context.close();
 });
 
-test('自由排版：默认是长文，切换模式、换画布、加图片和手帐素材、管理页面，导出一致，刷新后还在，长文不受影响', async () => {
+test('自由排版：默认是长文，切换模式、换画布、加图片和贴纸、管理页面，导出一致，刷新后还在，长文不受影响', async () => {
     const { page, context, errors } = await open();
     assert.equal(await page.evaluate(() => Studio.state.mode), 'long', '第一次打开默认是长文模式');
     const longText = await page.evaluate(() => Studio.state.text);
@@ -542,10 +542,14 @@ test('自由排版：默认是长文，切换模式、换画布、加图片和�
     assert.equal(st.pages, 1);
     assert.ok(st.n > 3, '应该放好一页示例');
     assert.equal(await page.locator('#grid .thumb').count(), 1);
+    assert.ok(await page.locator('#grid .pg.canvas-pixel').count() > 0, '默认画布是像素 Y2K');
+    assert.equal(await page.locator('.canvas-card').count(), 2, '只有像素 Y2K 和中世纪手抄本两张画布');
 
-    // 换画布
-    await page.locator('.canvas-card[data-canvas="gingham"]').click();
-    await page.waitForFunction(() => document.querySelector('#grid .pg.canvas-gingham'));
+    // 换画布：配套的中世纪贴纸排到前面
+    await page.locator('.canvas-card[data-canvas="manuscript"]').click();
+    await page.waitForFunction(() => document.querySelector('#grid .pg.canvas-manuscript'));
+    assert.equal(await page.locator('#decoList .fp-pack').first().textContent(), '中世纪手抄本');
+    assert.equal(await page.locator('#decoList .img-missing').count(), 0, '所有贴纸都能画出来');
 
     // 加一页，在第 2 页上加图片（不弹裁剪框，直接放上去）、胶带、描边
     await page.locator('#addPage').click();
@@ -562,10 +566,13 @@ test('自由排版：默认是长文，切换模式、换画布、加图片和�
     assert.equal(await page.locator('#cropDialog[open]').count(), 0, '自由排版加图片不应该弹裁剪框');
     await page.locator('#objBar select[data-act="border"]').selectOption('torn');
     await page.waitForFunction(() => document.querySelector('#grid .stk.b-torn'));
-    await page.locator('#decoList [data-deco="tape-sage"]').click();
-    await page.locator('#decoList [data-deco="star"]').click();
+    await page.locator('#decoList [data-deco="px-heart"]').click();
+    await page.locator('#decoList [data-deco="ms-manicule"]').click();
     st = await page.evaluate(() => Studio.state.stickers.filter((s) => s.page === 1).map((s) => s.deco || s.kind));
-    assert.deepEqual(st, ['img', 'tape-sage', 'star']);
+    assert.deepEqual(st, ['img', 'px-heart', 'ms-manicule']);
+    // 指示手可以左右翻转
+    await page.locator('#objBar [data-act="flip"]').click();
+    await page.waitForFunction(() => document.querySelector('#grid .stk.k-deco.flip'));
 
     // 复制第 2 页 → 第 3 页内容一样；把第 3 页挪到最前面；删掉它
     await page.locator('.fp-page[data-i="1"] [data-pact="dup"]').click();
@@ -586,6 +593,12 @@ test('自由排版：默认是长文，切换模式、换画布、加图片和�
         const res = await fidelity(page, i);
         assert.ok(res.ratio < 0.003, `自由排版第 ${i + 1} 页：导出差异 ${(res.ratio * 100).toFixed(2)}%`);
     }
+    await page.evaluate(() => Studio.setSettings({ canvas: 'pixel' }));
+    for (const i of [0, 1]) {
+        const res = await fidelity(page, i);
+        assert.ok(res.ratio < 0.003, `像素画布第 ${i + 1} 页：导出差异 ${(res.ratio * 100).toFixed(2)}%`);
+    }
+    await page.evaluate(() => Studio.setSettings({ canvas: 'manuscript' }));
 
     // 刷新后还在自由排版；切回长文，文章和原来的贴纸都没变
     await page.waitForTimeout(700);
@@ -593,7 +606,8 @@ test('自由排版：默认是长文，切换模式、换画布、加图片和�
     await page.evaluate(() => Studio.ready);
     assert.equal(await page.evaluate(() => Studio.state.mode), 'free');
     assert.equal(await page.evaluate(() => Studio.state.freePages), 2);
-    assert.ok(await page.locator('#grid .pg.canvas-gingham').count() > 0);
+    assert.ok(await page.locator('#grid .pg.canvas-manuscript').count() > 0);
+    assert.ok(await page.locator('#grid .stk.flip').count() > 0, '翻转要保存下来');
     await page.locator('#modeSeg [data-mode="long"]').click();
     await page.waitForFunction(() => !Studio.state.model.free);
     assert.equal(await page.evaluate(() => Studio.state.text), longText);
