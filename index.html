@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" crossorigin="anonymous"
-        href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&family=ZCOOL+KuaiLe&family=Ma+Shan+Zheng&display=swap">
+        href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&family=ZCOOL+KuaiLe&family=Ma+Shan+Zheng&family=Pixelify+Sans:wght@400;700&family=UnifrakturMaguntia&display=swap">
 
     <link rel="stylesheet" href="css/app.css">
     <link rel="stylesheet" href="css/pages.css">
@@ -22,6 +22,7 @@
     <script src="lib/jszip.min.js" defer></script>
     <script src="js/markdown.js" defer></script>
     <script src="js/themes.js" defer></script>
+    <script src="js/decos.js" defer></script>
     <script src="js/canvases.js" defer></script>
     <script src="js/store.js" defer></script>
     <script src="js/render.js" defer></script>
@@ -108,13 +109,13 @@
                         <button data-fline="both" title="双向箭头"><svg class="i" viewBox="0 0 24 24"><path d="M3 12h18M8 7l-5 5 5 5M16 7l5 5-5 5"/></svg></button>
                     </div>
 
-                    <h4>手帐素材</h4>
+                    <h4>贴纸</h4>
                     <div class="fp-decos" id="decoList"></div>
 
                     <h4>页面 <button class="btn small" id="addPage">＋ 加一页</button></h4>
                     <div class="fp-pages" id="pageList"></div>
 
-                    <p class="fp-tip">💡 图片可以直接拖到右边的页面上，或者复制后按 Ctrl/⌘ + V 粘贴。选中图片后，工具条上可以加「描边」、裁剪、抠图。</p>
+                    <p class="fp-tip">💡 图片可以直接拖到右边的页面上，或者复制后按 Ctrl/⌘ + V 粘贴。选中图片或贴纸后，工具条上可以加「描边」、翻转、裁剪、抠图。</p>
                     <input type="file" id="photoInput" accept="image/*" multiple hidden>
                 </div>
 

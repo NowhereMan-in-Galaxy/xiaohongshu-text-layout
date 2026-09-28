@@ -19,7 +19,7 @@
     const DEFAULTS = {
         theme: 'grid',
         accent: null,
-        canvas: 'sage', // 自由排版模式的画布
+        canvas: 'pixel', // 自由排版模式的画布
         canvasAccent: null,
         ratio: '3:4',
         fontSize: 36,
@@ -641,6 +641,8 @@
         state.text = d.text || '';
         state.longStk = stickersOf(d);
         state.settings = mergeSettings(d.settings);
+        // 旧版本的画布（莫兰迪绿、奶油格子……）已经删掉，换成默认画布
+        if (!Canvases.list.some((c) => c.id === state.settings.canvas)) Object.assign(state.settings, { canvas: DEFAULTS.canvas, canvasAccent: null });
         const free = d.free || {};
         state.freeStk = free.stickers || [];
         state.freePages = Math.max(1, free.pages || 1);
@@ -651,6 +653,7 @@
         ed.value = state.text;
         $('#freeTitle').value = state.freeTitle;
         syncMode();
+        renderDecoList();
     }
 
     function loadDraft(id) {
@@ -694,19 +697,18 @@
 
     /** 第一次进入自由排版时放一页示例，方便看出能怎么玩（删掉或清空这一页就好） */
     function starterPage() {
-        const INK = '#3a3326';
         const id = () => Store.drafts.newId();
         const base = { page: 0, shape: 'none', outline: false, shadow: false };
         return [
-            { kind: 'deco', deco: 'note-paper', x: 560, y: 830, w: 780, rot: 2 },
-            { kind: 'deco', deco: 'tape-pink', x: 560, y: 560, w: 300, rot: -4 },
-            { kind: 'deco', deco: 'tape-sage', x: 250, y: 170, w: 420, rot: -9 },
-            { kind: 'text', text: '周末碎碎念', fs: 120, style: 'plain', color: null, font: 'round', bold: true, x: 540, y: 330, w: 900, rot: 0 },
-            { kind: 'text', text: '今天去了新开的咖啡店 ☕\n拿铁很好喝，下次还来！', fs: 50, style: 'plain', color: INK, font: 'kai', bold: false, x: 560, y: 820, w: 660, rot: 2 },
-            { kind: 'deco', deco: 'star', x: 900, y: 520, w: 150, rot: 12 },
-            { kind: 'deco', deco: 'sparkles', x: 170, y: 560, w: 170, rot: 0 },
-            { kind: 'deco', deco: 'heart', x: 230, y: 1190, w: 140, rot: -10 },
-            { kind: 'deco', deco: 'label', x: 800, y: 1200, w: 320, rot: -6 },
+            { kind: 'text', text: '周末碎碎念', fs: 118, style: 'plain', color: '#3b1f4a', font: 'round', bold: true, x: 540, y: 250, w: 900, rot: -2 },
+            { kind: 'text', text: '今日份快乐已加载完成 ♥', fs: 46, style: 'label', color: '#ff4f9a', font: 'round', bold: true, x: 540, y: 380, w: 720, rot: 0 },
+            { kind: 'deco', deco: 'px-dialog', x: 560, y: 690, w: 720, rot: -3 },
+            { kind: 'deco', deco: 'px-cursor', x: 830, y: 820, w: 110, rot: -8 },
+            { kind: 'deco', deco: 'px-butterfly', x: 190, y: 480, w: 190, rot: -12 },
+            { kind: 'deco', deco: 'px-heart', x: 900, y: 470, w: 130, rot: 10 },
+            { kind: 'deco', deco: 'px-sparkle', x: 170, y: 930, w: 110, rot: 0 },
+            { kind: 'deco', deco: 'px-cd', x: 300, y: 1080, w: 220, rot: 0 },
+            { kind: 'deco', deco: 'px-loading', x: 700, y: 1060, w: 440, rot: 3 },
         ].map((st) => ({ id: id(), ...base, ...st }));
     }
 
@@ -803,13 +805,17 @@
     }
 
     function addDeco(id) {
-        const tape = id.startsWith('tape');
-        addSticker({ kind: 'deco', deco: id, w: tape ? 400 : id === 'note-paper' ? 520 : 220, rot: tape ? -8 : 0 });
+        const d = Decos.get(id);
+        addSticker({ kind: 'deco', deco: id, w: d ? d.w : 220 });
     }
 
+    /** 两套贴纸分组显示，和当前画布配套的那套排在前面 */
     function renderDecoList() {
-        $('#decoList').innerHTML = Stickers.DECOS.map(([id, name]) => `
-            <button data-deco="${id}" title="${name}"><span class="stk deco-prev">${Stickers.decoHtml({ deco: id })}</span></button>`).join('');
+        const cur = state.settings.canvas === 'manuscript' ? 'medieval' : 'y2k';
+        const packs = [...Decos.PACKS].sort((a, b) => (b.id === cur) - (a.id === cur));
+        $('#decoList').innerHTML = packs.map((p) => `
+            <div class="fp-pack">${p.name}</div>
+            ${p.items.map(([id, name, html]) => `<button data-deco="${id}" title="${name}"><span class="stk deco-prev">${html}</span></button>`).join('')}`).join('');
     }
 
     function renderDraftMenu() {
@@ -925,6 +931,7 @@
             state.settings.canvas = b.dataset.canvas;
             state.settings.canvasAccent = null;
             syncSettingsUI();
+            renderDecoList();
             schedule();
         });
 
@@ -1209,6 +1216,7 @@
                     html += `<label class="cut-range" title="抠得不干净就往右拖，抠过头了就往左拖"><input type="range" data-act="strength" min="1" max="100" value="${st.cut}"></label>`;
                 }
             }
+            if (st.kind === 'img' || st.kind === 'deco' || st.kind === 'emoji') html += `<button data-act="flip" class="${st.flip ? 'on' : ''}" title="左右翻转">翻转</button>`;
             if (st.kind !== 'line') html += `<select data-act="border" title="描边：拼贴风格">${opts(Stickers.BORDERS, Stickers.borderOf(st))}</select>`;
             html += `<button data-act="shadow" class="${st.shadow ? 'on' : ''}" title="投影">阴影</button><span class="sep"></span>`;
             html += `<button data-act="dup" title="复制一个">${ICON.copy}</button><button data-act="del" title="删除 (Delete)">${ICON.del}</button>`;
@@ -1819,6 +1827,7 @@
             case 'outline': st.outline = !st.outline; commitStickers(); break;
             case 'border': st.border = b.value; st.outline = false; commitStickers(); break;
             case 'shadow': st.shadow = !st.shadow; commitStickers(); break;
+            case 'flip': st.flip = !st.flip; commitStickers(); break;
             case 'cut': cutSticker(st, st.cut ? 0 : 50); break;
             case 'strength': cutSticker(st, Number(b.value)); break;
             case 'cutmode': st.cutMode = b.value; cutSticker(st, 50); break;
