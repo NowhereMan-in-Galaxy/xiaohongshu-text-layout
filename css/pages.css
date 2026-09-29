@@ -912,7 +912,7 @@
         radial-gradient(circle at 10% 38%, rgba(255, 255, 255, 0.4) 1.5px, transparent 2.5px);
 }
 
-/* 5. 便利贴 —— 桌面上的一张黄色便签 */
+/* 5. 便利贴 —— 背景借用「便利贴」画布（桌上一张略歪的黄色便利贴），这里只管文字 */
 .theme-sticky {
     --bg: #ece8df;
     --ink: #3a3326;
@@ -927,37 +927,9 @@
     --pb: 190px;
 }
 
-.theme-sticky .pg-bg {
-    background-image: var(--noise);
-    opacity: 0.6;
-}
-
-.theme-sticky .note {
-    left: 64px;
-    right: 64px;
-    top: 96px;
-    bottom: 84px;
-    background: linear-gradient(180deg, #fff3a3 0%, #ffec85 100%);
-    box-shadow: 0 30px 50px -24px rgba(70, 55, 20, 0.45), 0 2px 6px rgba(70, 55, 20, 0.15);
-    transform: rotate(-0.6deg);
-    border-radius: 6px 6px 30px 6px;
-}
-
-.theme-sticky .tape {
-    top: 64px;
-    left: 50%;
-    width: 240px;
-    height: 70px;
-    margin-left: -120px;
-    background: rgba(255, 255, 255, 0.55);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-    transform: rotate(2deg);
-}
-
 .theme-sticky .h1,
 .theme-sticky .h2 { color: var(--accent); }
 .theme-sticky .h .hx { background: linear-gradient(transparent 60%, rgba(255, 255, 255, 0.7) 60%); }
-.theme-sticky .pg-footer { bottom: 118px; }
 .theme-sticky .cv { top: 200px; bottom: 200px; }
 .theme-sticky .cv-meta { bottom: -80px; }
 
@@ -1529,7 +1501,7 @@
 /* ------------------------------------------------------------------ 有纹理的画布：共用的纹理层 */
 
 /* .tex 铺满整页，用正片叠底把纸纹「印」在底色上（纹理图在 js/assets.js） */
-.pg.canvas .tex {
+.pg .tex {
     inset: 0;
     background: var(--tex-paper) 0 0 / 640px 640px;
     mix-blend-mode: multiply;
@@ -1736,3 +1708,68 @@
     object-fit: cover;
     clip-path: polygon(1% 2%, 8% 0, 16% 2%, 24% 0, 33% 1.5%, 41% 0, 50% 2%, 58% 0.5%, 67% 2%, 75% 0, 83% 1.5%, 91% 0, 99% 2%, 100% 10%, 98.5% 19%, 100% 28%, 98.5% 37%, 100% 46%, 98.5% 55%, 100% 64%, 98.5% 73%, 100% 82%, 98.5% 91%, 99% 99%, 91% 100%, 83% 98.5%, 75% 100%, 67% 98.5%, 58% 100%, 50% 98.5%, 41% 100%, 33% 98.5%, 24% 100%, 16% 98.5%, 8% 100%, 1% 98%, 0 90%, 1.5% 81%, 0 72%, 1.5% 63%, 0 54%, 1.5% 45%, 0 36%, 1.5% 27%, 0 18%);
 }
+
+/* ==================================================================
+ * 借用画布当背景的长文主题（themes.js 里的 canvas 字段）：背景和装饰都来自画布，这里只调文字区域
+ * ================================================================== */
+
+.theme-memo .tex { opacity: 0.5; }
+
+.theme-pearl {
+    --ink: #2f3140;
+    --muted: #6b6e7a;
+    --hl: color-mix(in srgb, var(--accent) 22%, rgba(255, 255, 255, 0.6));
+    --soft: rgba(255, 255, 255, 0.4);
+    --code-bg: rgba(255, 255, 255, 0.45);
+    --rule: rgba(60, 62, 80, 0.16);
+    --pad-x: 100px;
+    --pt: 140px;
+    --pb: 150px;
+}
+
+.theme-dotgrid {
+    --ink: #2e2c29;
+    --muted: #9a9387;
+    --hl: color-mix(in srgb, var(--accent) 26%, transparent);
+    --soft: rgba(250, 248, 242, 0.85);
+    --pad-x: 108px;
+    --pt: 170px;
+    --pb: 150px;
+}
+.pg.theme-dotgrid.r-wide { --pad-t: 140px; }
+
+/* 像素 Y2K：文字放在窗口里，标题栏和任务栏之间 */
+.theme-pixel {
+    --muted: #8a6f9e;
+    --hl: color-mix(in srgb, var(--accent) 28%, transparent);
+    --soft: rgba(241, 233, 255, 0.8);
+    --code-bg: #f1e9ff;
+    --rule: rgba(59, 31, 74, 0.16);
+    --pad-x: 104px;
+    --pt: 196px;
+    --pb: 214px;
+}
+.pg.theme-pixel.r-wide { --pad-t: 180px; --pad-b: 200px; }
+.theme-pixel .h1,
+.theme-pixel .h2 { color: var(--accent); }
+
+/* 中世纪手抄本：文字放在朱红界线框里（框左边宽、右边窄），标题用哥特体 + 宋体 */
+.theme-manuscript {
+    --muted: #8a6d4f;
+    --hl: rgba(214, 165, 58, 0.32);
+    --soft: rgba(255, 248, 230, 0.6);
+    --code-bg: rgba(120, 80, 30, 0.08);
+    --rule: rgba(184, 67, 47, 0.3);
+    --font-body: var(--serif);
+    --pad-x: 150px;
+    --pt: 190px;
+    --pb: 210px;
+}
+.pg.theme-manuscript.r-wide { --pad-t: 180px; --pad-b: 200px; }
+.theme-manuscript .pg-body,
+.theme-manuscript .pg-header { left: 200px; right: 128px; }
+.theme-manuscript .h1,
+.theme-manuscript .h2 { color: var(--accent); }
+.theme-manuscript .cv { left: 200px; right: 128px; }
+.theme-manuscript .cv-meta { bottom: -56px; }
+.theme-pixel .cv-meta { bottom: -34px; }

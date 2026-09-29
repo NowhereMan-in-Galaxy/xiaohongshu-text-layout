@@ -138,13 +138,15 @@ const Render = (() => {
         el.className = [
             'pg',
             'theme-' + theme.id,
+            theme.canvas ? 'canvas-' + theme.canvas : '',
             w > h ? 'r-wide' : '',
             header ? 'has-header' : '',
             opt.cover ? 'is-cover' : '',
         ].filter(Boolean).join(' ');
         for (const [k, v] of Object.entries(pageStyle(s))) el.style.setProperty(k, v);
 
-        const pick = opt.cover ? (theme.coverDeco ?? theme.deco ?? '') : (theme.deco || '');
+        const pick = theme.canvas ? Canvases.get(theme.canvas).deco || ''
+            : opt.cover ? (theme.coverDeco ?? theme.deco ?? '') : (theme.deco || '');
         const deco = typeof pick === 'function' ? pick(s) : pick;
         let html = `<div class="pg-bg"></div><div class="pg-deco">${deco}</div>`;
         if (!opt.cover) {

@@ -278,7 +278,7 @@ async function fidelity(page, idx) {
 
 test('导出的 PNG 尺寸正确，并且和屏幕上的渲染逐像素一致', async () => {
     const { page, context } = await open();
-    for (const theme of ['memo', 'cream', 'night', 'grid', 'candy']) {
+    for (const theme of ['memo', 'cream', 'night', 'grid', 'candy', 'sticky', 'pearl', 'dotgrid', 'pixel', 'manuscript']) {
         await page.evaluate((t) => Studio.setSettings({ theme: t }), theme);
         for (const i of [0, 1]) {
             const result = await fidelity(page, i);

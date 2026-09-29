@@ -3,6 +3,7 @@
  *
  * 想新增主题？在这里加一项，再到 pages.css 里写一个 .theme-xxx 就好。
  * deco / coverDeco 可以是一段 HTML，也可以是返回 HTML 的函数（比如要显示当天日期）。
+ * canvas：直接借用自由排版的某张画布当背景（背景、纹理和装饰都用画布的），主题只管文字区域。
  */
 const Themes = (() => {
     // 苹果「备忘录」截图的样子：状态栏、黄色的「‹ 备忘录」、日期、底部工具栏
@@ -44,9 +45,9 @@ const Themes = (() => {
             desc: '像 iPhone 备忘录截图，真实感拉满',
             accents: ['#e3a008', '#ff3b30', '#007aff', '#34c759', '#af52de', '#1c1c1e'],
             swatch: ['#ffffff', '#e3a008'],
-            deco: IOS.status + IOS.nav + IOS.tool,
+            deco: '<i class="tex"></i>' + IOS.status + IOS.nav + IOS.tool,
             // 封面顶上多一行灰色日期（每次打开按当天日期显示）
-            coverDeco: () => IOS.status + IOS.nav + `<div class="ios-date">${memoDate()}</div>` + IOS.tool,
+            coverDeco: () => '<i class="tex"></i>' + IOS.status + IOS.nav + `<div class="ios-date">${memoDate()}</div>` + IOS.tool,
         },
         {
             id: 'cream',
@@ -83,10 +84,43 @@ const Themes = (() => {
         {
             id: 'sticky',
             name: '便利贴',
-            desc: '桌面上的一张黄色便签',
+            desc: '桌上一张略歪、底角翘起的黄色便利贴',
             accents: ['#e4572e', '#2f6feb', '#2b8a3e', '#8f3fbf', '#3a3326', '#d6336c'],
-            swatch: ['#ffee8f', '#e4572e'],
-            deco: '<i class="note"></i><i class="tape"></i>',
+            swatch: ['#e9e5dd', '#fbe38c'],
+            canvas: 'sticky',
+        },
+        // 下面四套直接用自由排版的画布做背景（canvas 字段），样式见 pages.css 的「画布」部分
+        {
+            id: 'pearl',
+            name: '珠光银',
+            desc: '银色拉丝纸 + 淡淡的彩虹珠光',
+            accents: ['#3a3d4a', '#b0527a', '#4a6fa5', '#7a6aa8', '#9a7b3c', '#2b7a78'],
+            swatch: ['#dfe1e8', '#c9b8d8'],
+            canvas: 'pearl',
+        },
+        {
+            id: 'dotgrid',
+            name: '点阵本',
+            desc: '米白纸纤维 + 灰色圆点，手帐本同款',
+            accents: ['#d0503c', '#3f6fb5', '#4c8a5a', '#b07d2b', '#8a5bb0', '#2e2c29'],
+            swatch: ['#faf8f2', '#b9b3a7'],
+            canvas: 'dotgrid',
+        },
+        {
+            id: 'pixel',
+            name: '像素 Y2K',
+            desc: '老电脑窗口 my_diary.exe',
+            accents: ['#ff4f9a', '#7a5cff', '#00a6c7', '#ffb800', '#3b1f4a', '#2fbf71'],
+            swatch: ['#f5d2ff', '#ff78c4'],
+            canvas: 'pixel',
+        },
+        {
+            id: 'manuscript',
+            name: '中世纪手抄本',
+            desc: '羊皮纸、朱红界线、金边条和常春藤',
+            accents: ['#b8432f', '#2f5597', '#a57a22', '#557f4e', '#2b1d14', '#7a3b69'],
+            swatch: ['#f3e7cc', '#b8432f'],
+            canvas: 'manuscript',
         },
         {
             id: 'night',
