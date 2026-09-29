@@ -64,6 +64,35 @@ const Canvases = (() => {
             swatch: ['#f3e7cc', '#b8432f'],
             deco: manuscriptDeco,
         },
+        // 下面四张都叠了真实的纸 / 金属纹理（js/assets.js）
+        {
+            id: 'pearl',
+            name: '珠光银',
+            accents: ['#3a3d4a', '#b0527a', '#4a6fa5', '#7a6aa8', '#ffffff', '#9a7b3c'],
+            swatch: ['#dfe1e8', '#c9b8d8'],
+            deco: '<i class="tex"></i><i class="sheen"></i>',
+        },
+        {
+            id: 'dotgrid',
+            name: '点阵本',
+            accents: ['#2e2c29', '#d0503c', '#3f6fb5', '#4c8a5a', '#b07d2b', '#8a5bb0'],
+            swatch: ['#faf8f2', '#b9b3a7'],
+            deco: '<i class="tex"></i><i class="gutter"></i><span class="dg-head">No. <u></u>Date <u></u></span>',
+        },
+        {
+            id: 'sticky',
+            name: '便利贴',
+            accents: ['#3b3320', '#d0503c', '#2f5fa8', '#4c7a3a', '#8a4fa8', '#ffffff'],
+            swatch: ['#e9e5dd', '#fbe38c'],
+            deco: '<i class="tex"></i><i class="lift l"></i><i class="lift r"></i><i class="note"></i>',
+        },
+        {
+            id: 'notes',
+            name: '备忘录',
+            accents: ['#e3a008', '#ff3b30', '#007aff', '#34c759', '#af52de', '#1c1c1e'],
+            swatch: ['#ffffff', '#e3a008'],
+            deco: () => '<i class="tex"></i>' + Themes.IOS.status + Themes.IOS.nav + `<div class="ios-date">${Themes.memoDate()}</div>` + Themes.IOS.tool,
+        },
     ];
 
     const byId = Object.fromEntries(list.map((c) => [c.id, c]));

@@ -144,5 +144,5 @@ const Themes = (() => {
         }
     }
 
-    return { list, get, installNoise };
+    return { list, get, installNoise, IOS, memoDate };
 })();

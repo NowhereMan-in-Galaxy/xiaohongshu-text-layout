@@ -170,7 +170,8 @@ const Render = (() => {
         const accent = s.canvasAccent || cv.accents[0];
         const vars = { ...pageStyle(s), '--accent': accent, '--accent-ink': inkOn(accent) };
         for (const [k, v] of Object.entries(vars)) el.style.setProperty(k, v);
-        let html = `<div class="pg-bg"></div><div class="pg-deco">${cv.deco || ''}</div>`;
+        const deco = typeof cv.deco === 'function' ? cv.deco(s) : cv.deco || '';
+        let html = `<div class="pg-bg"></div><div class="pg-deco">${deco}</div>`;
         const wm = s.watermark.trim() ? `<span class="pg-wm">${esc(s.watermark.trim())}</span>` : '';
         const num = s.pageNum ? `<span class="pg-num">${numText(opt.index || 0, opt.total || 1)}</span>` : '';
         if (wm || num) html += `<div class="pg-footer">${wm}${num}</div>`;

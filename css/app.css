@@ -567,13 +567,16 @@ body:not(.mode-free) .free-only { display: none !important; }
     place-items: center;
 }
 
-.fp-decos .deco-prev svg {
+.fp-decos .deco-prev .stk-in {
     width: 100%;
     height: auto;
     max-height: 48px;
     display: block;
+    object-fit: contain;
     transform: none;
 }
+
+.fp-decos .deco-prev .sticky-note { width: 42px; }
 
 .fp-decos .fp-pack {
     grid-column: 1 / -1;
