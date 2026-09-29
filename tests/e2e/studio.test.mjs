@@ -543,7 +543,7 @@ test('自由排版：默认是长文，切换模式、换画布、加图片和�
     assert.ok(st.n > 3, '应该放好一页示例');
     assert.equal(await page.locator('#grid .thumb').count(), 1);
     assert.ok(await page.locator('#grid .pg.canvas-pixel').count() > 0, '默认画布是像素 Y2K');
-    assert.equal(await page.locator('.canvas-card').count(), 2, '只有像素 Y2K 和中世纪手抄本两张画布');
+    assert.equal(await page.locator('.canvas-card').count(), 6, '像素 Y2K、中世纪手抄本、珠光银、点阵本、便利贴、备忘录');
 
     // 换画布：配套的中世纪贴纸排到前面
     await page.locator('.canvas-card[data-canvas="manuscript"]').click();
@@ -597,6 +597,12 @@ test('自由排版：默认是长文，切换模式、换画布、加图片和�
     for (const i of [0, 1]) {
         const res = await fidelity(page, i);
         assert.ok(res.ratio < 0.003, `像素画布第 ${i + 1} 页：导出差异 ${(res.ratio * 100).toFixed(2)}%`);
+    }
+    // 有纹理的画布（纹理和手抄本插画都内嵌成 data URL），导出也要一致
+    for (const c of ['pearl', 'dotgrid', 'sticky', 'notes']) {
+        await page.evaluate((cv) => Studio.setSettings({ canvas: cv }), c);
+        const res = await fidelity(page, 1);
+        assert.ok(res.ratio < 0.003, `${c} 画布：导出差异 ${(res.ratio * 100).toFixed(2)}%`);
     }
     await page.evaluate(() => Studio.setSettings({ canvas: 'manuscript' }));
 

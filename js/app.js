@@ -811,7 +811,7 @@
 
     /** 两套贴纸分组显示，和当前画布配套的那套排在前面 */
     function renderDecoList() {
-        const cur = state.settings.canvas === 'manuscript' ? 'medieval' : 'y2k';
+        const cur = { pixel: 'y2k', manuscript: 'medieval' }[state.settings.canvas] || 'paper';
         const packs = [...Decos.PACKS].sort((a, b) => (b.id === cur) - (a.id === cur));
         $('#decoList').innerHTML = packs.map((p) => `
             <div class="fp-pack">${p.name}</div>
@@ -857,7 +857,7 @@
 
         $('#canvasList').innerHTML = Canvases.list.map((c) => `
             <button class="theme-card canvas-card" data-canvas="${c.id}">
-                <span class="sw"><span class="pg canvas canvas-${c.id}"><span class="pg-bg"></span><span class="pg-deco">${c.deco || ''}</span></span></span>
+                <span class="sw"><span class="pg canvas canvas-${c.id}"><span class="pg-bg"></span><span class="pg-deco">${typeof c.deco === 'function' ? c.deco(state.settings) : c.deco || ''}</span></span></span>
                 ${c.name}
             </button>`).join('');
 

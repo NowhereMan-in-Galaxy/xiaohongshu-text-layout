@@ -669,6 +669,20 @@ const Decos = (() => {
                 ['ms-initial', '首字母框', initial, 220],
                 ['ms-hedera', '叶形花饰', hedera, 200],
                 ['ms-vine', '藤蔓花边', vine, 520],
+                // 真的手抄本插画（公有领域，见 js/assets.js）
+                ...Assets.ART.map((a) => [a.id, a.name, `<img class="stk-in deco art" src="${a.src}" alt="" draggable="false" style="aspect-ratio:${a.w}/${a.h}">`, Math.round(a.w * 0.62)]),
+            ],
+        },
+        {
+            id: 'paper',
+            name: '纸条和便利贴',
+            items: [
+                ['strip-silver', '珠光银纸条', '<div class="stk-in deco paper-strip strip-silver"></div>', 460],
+                ['strip-holo', '镭射纸条', '<div class="stk-in deco paper-strip strip-holo"></div>', 460],
+                ['strip-kraft', '牛皮纸条', '<div class="stk-in deco paper-strip strip-kraft"></div>', 420],
+                ['note-yellow', '黄色便利贴', '<div class="stk-in deco sticky-note"></div>', 380],
+                ['note-pink', '粉色便利贴', '<div class="stk-in deco sticky-note note-pink"></div>', 380],
+                ['note-blue', '蓝色便利贴', '<div class="stk-in deco sticky-note note-blue"></div>', 380],
             ],
         },
     ];

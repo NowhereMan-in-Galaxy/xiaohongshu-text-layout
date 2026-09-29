@@ -534,7 +534,7 @@
     --pad-b: 230px;
 }
 
-.theme-memo .ios-status {
+:is(.theme-memo, .canvas-notes) .ios-status {
     left: 0;
     right: 0;
     top: 0;
@@ -548,13 +548,13 @@
     letter-spacing: -0.01em;
 }
 
-.theme-memo .ios-status span {
+:is(.theme-memo, .canvas-notes) .ios-status span {
     display: flex;
     align-items: center;
     gap: 14px;
 }
 
-.theme-memo .ios-nav {
+:is(.theme-memo, .canvas-notes) .ios-nav {
     left: 0;
     right: 0;
     top: 132px;
@@ -567,19 +567,19 @@
     font: 400 50px/1 var(--sans);
 }
 
-.theme-memo .ios-nav .back {
+:is(.theme-memo, .canvas-notes) .ios-nav .back {
     display: flex;
     align-items: center;
     gap: 14px;
 }
 
-.theme-memo .ios-nav .acts {
+:is(.theme-memo, .canvas-notes) .ios-nav .acts {
     display: flex;
     align-items: center;
     gap: 52px;
 }
 
-.theme-memo .ios-date {
+:is(.theme-memo, .canvas-notes) .ios-date {
     left: 0;
     right: 0;
     top: 262px;
@@ -588,7 +588,7 @@
     color: var(--muted);
 }
 
-.theme-memo .ios-tool {
+:is(.theme-memo, .canvas-notes) .ios-tool {
     left: 64px;
     right: 64px;
     bottom: 76px;
@@ -599,7 +599,7 @@
     color: var(--accent);
 }
 
-.theme-memo .ios-home {
+:is(.theme-memo, .canvas-notes) .ios-home {
     left: 50%;
     bottom: 24px;
     width: 400px;
@@ -1525,6 +1525,179 @@
     font-family: "UnifrakturMaguntia", var(--serif);
     font-size: 30px;
 }
+
+/* ------------------------------------------------------------------ 有纹理的画布：共用的纹理层 */
+
+/* .tex 铺满整页，用正片叠底把纸纹「印」在底色上（纹理图在 js/assets.js） */
+.pg.canvas .tex {
+    inset: 0;
+    background: var(--tex-paper) 0 0 / 640px 640px;
+    mix-blend-mode: multiply;
+}
+
+/* ------------------------------------------------------------------ 珠光银：银灰底 + 淡淡的彩虹珠光 + 金属拉丝和闪片 */
+
+.canvas-pearl {
+    --bg: #dcdee4;
+    --ink: #34363f;
+}
+
+.canvas-pearl .pg-bg {
+    background:
+        linear-gradient(118deg, rgba(255, 190, 222, 0.3) 0%, rgba(190, 206, 255, 0.28) 28%, rgba(190, 244, 226, 0.24) 52%, rgba(255, 230, 190, 0.26) 76%, rgba(218, 196, 255, 0.3) 100%),
+        linear-gradient(172deg, #e9ebef 0%, #b9bdc7 30%, #dcdee4 52%, #a9adb8 78%, #cfd2d9 100%);
+}
+
+.pg.canvas-pearl .tex {
+    background: var(--tex-metal) 0 0 / 640px 640px;
+    mix-blend-mode: overlay;
+    opacity: 0.5;
+}
+
+/* 两道斜着的反光，像纸拿在灯下 */
+.canvas-pearl .sheen {
+    inset: 0;
+    background:
+        linear-gradient(158deg, transparent 12%, rgba(255, 255, 255, 0.7) 24%, rgba(255, 255, 255, 0.15) 33%, transparent 42%),
+        linear-gradient(158deg, transparent 58%, rgba(255, 255, 255, 0.45) 68%, transparent 78%);
+}
+
+.pg.canvas-pearl .pg-footer { color: #6b6e7a; }
+
+/* ------------------------------------------------------------------ 点阵本：米白纸 + 纸纤维 + 灰色圆点 + 装订处的阴影 */
+
+.canvas-dotgrid {
+    --bg: #faf8f2;
+    --ink: #2e2c29;
+}
+
+.canvas-dotgrid .pg-bg {
+    background:
+        radial-gradient(circle, rgba(128, 120, 108, 0.55) 2.3px, transparent 3px) 27px 27px / 54px 54px,
+        #faf8f2;
+}
+
+/* 左边靠近装订线的地方暗一点，像本子摊开 */
+.canvas-dotgrid .gutter {
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 110px;
+    background: linear-gradient(90deg, rgba(60, 50, 35, 0.16), rgba(60, 50, 35, 0.05) 40%, transparent);
+}
+
+.canvas-dotgrid .dg-head {
+    right: 64px;
+    top: 50px;
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    font: 400 26px/1 Georgia, var(--serif);
+    color: #a39c8f;
+    letter-spacing: 0.04em;
+}
+
+.canvas-dotgrid .dg-head u {
+    display: inline-block;
+    width: 150px;
+    margin-right: 24px;
+    border-bottom: 2px solid #cfc8bb;
+}
+
+.canvas-dotgrid .dg-head u:last-child { width: 200px; margin-right: 0; }
+
+/* ------------------------------------------------------------------ 便利贴：桌面上一张略歪的黄色便利贴，底部两角翘起来 */
+
+.canvas-sticky {
+    --bg: #e9e5dd;
+    --ink: #3b3320;
+}
+
+.canvas-sticky .pg-bg { background: linear-gradient(180deg, #ece8e0, #e1dcd2); }
+.pg.canvas-sticky .tex { background-size: 900px 900px; }
+
+.canvas-sticky .note {
+    left: 64px;
+    right: 64px;
+    top: 84px;
+    bottom: 104px;
+    transform: rotate(-1.1deg);
+    background:
+        linear-gradient(0deg, rgba(120, 90, 0, 0.07), transparent 90px),
+        linear-gradient(180deg, rgba(200, 150, 0, 0.14) 0 150px, rgba(200, 150, 0, 0.04) 176px, transparent 210px),
+        var(--tex-sticky) 0 0 / 640px 640px,
+        #fde58c;
+    background-blend-mode: normal, normal, multiply, normal;
+    box-shadow: 0 1px 2px rgba(60, 45, 0, 0.18), 0 6px 14px -6px rgba(60, 45, 0, 0.2);
+}
+
+/* 两个翘起来的角在桌面上投下的影子 */
+.canvas-sticky .lift {
+    bottom: 118px;
+    width: 42%;
+    height: 80px;
+    box-shadow: 0 30px 24px rgba(40, 30, 10, 0.3);
+}
+.canvas-sticky .lift.l { left: 84px; transform: rotate(-4deg); }
+.canvas-sticky .lift.r { right: 96px; transform: rotate(2deg); }
+
+.pg.canvas-sticky .pg-footer { left: 110px; right: 110px; bottom: 136px; color: #8a7a45; }
+
+/* ------------------------------------------------------------------ 备忘录：和长文的「备忘录」主题同款的状态栏、导航和工具栏 */
+
+.canvas-notes {
+    --bg: #fffefb;
+    --ink: #1c1c1e;
+    --muted: #8e8e93;
+}
+
+.canvas-notes .pg-bg { background: #fffefb; }
+.pg.canvas-notes .tex { opacity: 0.55; }
+.canvas-notes .ios-date { top: 262px; }
+.pg.canvas-notes .pg-footer { bottom: 186px; }
+
+/* ------------------------------------------------------------------ 纸条贴纸：珠光银纸条、镭射纸条、便利贴（js/decos.js） */
+
+.stk .paper-strip {
+    aspect-ratio: 5.2 / 1;
+    clip-path: polygon(0 6%, 2% 0, 97% 3%, 100% 0, 99% 38%, 100% 70%, 98.5% 100%, 3% 96%, 0 100%, 1.2% 60%);
+    box-shadow: inset 0 0 0 999px rgba(255, 255, 255, 0.04);
+}
+
+.stk .strip-silver {
+    background:
+        linear-gradient(170deg, transparent 20%, rgba(255, 255, 255, 0.6) 42%, transparent 60%),
+        var(--tex-metal) 0 0 / 420px 420px,
+        linear-gradient(100deg, #e9d9e6, #d6dcef 35%, #d9ece6 60%, #e8e0d2 85%, #ddd3ee);
+    background-blend-mode: normal, soft-light, normal;
+}
+
+.stk .strip-holo {
+    background:
+        linear-gradient(170deg, transparent 25%, rgba(255, 255, 255, 0.55) 45%, transparent 62%),
+        var(--tex-metal) 0 0 / 420px 420px,
+        linear-gradient(100deg, #ffc6e6, #c7d2ff 22%, #b9f3e4 44%, #fff0b8 66%, #f5c2ff 88%, #c7e4ff);
+    background-blend-mode: normal, soft-light, normal;
+}
+
+.stk .strip-kraft {
+    background: var(--tex-paper) 0 0 / 640px 640px, #d8bd94;
+    background-blend-mode: multiply;
+}
+
+.stk .sticky-note {
+    aspect-ratio: 1;
+    background:
+        linear-gradient(0deg, rgba(120, 90, 0, 0.08), transparent 30%),
+        linear-gradient(180deg, rgba(0, 0, 0, 0.05) 0 16%, transparent 20%),
+        var(--tex-sticky) 0 0 / 640px 640px,
+        var(--note, #fde58c);
+    background-blend-mode: normal, normal, multiply, normal;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15), 0 14px 16px -12px rgba(0, 0, 0, 0.35);
+}
+
+.stk .note-pink { --note: #fbc4d3; }
+.stk .note-blue { --note: #bfe0f5; }
 
 /* ------------------------------------------------------------------ 素材贴纸（js/decos.js） */
 
